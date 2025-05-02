@@ -19,6 +19,10 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Настройки шифрования для PostgreSQL pgp_sym_encrypt
+    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', 'pgp-encryption-key-replace-in-production')
+    ENCRYPTION_OPTIONS = os.environ.get('ENCRYPTION_OPTIONS', 'cipher-algo=aes256')
+    
     # JWT настройки
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-replace-in-production')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=15)

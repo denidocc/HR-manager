@@ -13,8 +13,8 @@ class SystemLog(db.Model):
     ip_address: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     created_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), default=datetime.utcnow)
     
-    # Отношения
-    user = so.relationship('User', backref='system_logs')
+    # Отношения - используем обычное отношение вместо backref
+    user = so.relationship('User')
     
     def __repr__(self):
         return f'<SystemLog {self.id}: {self.event_type}>'

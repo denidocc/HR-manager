@@ -6,6 +6,7 @@ from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
+from flask_argon2 import Argon2
 from config import config
 
 # Инициализация расширений
@@ -14,6 +15,7 @@ migrate = Migrate()
 login_manager = LoginManager()
 jwt = JWTManager()
 mail = Mail()
+argon2 = Argon2()
 
 def create_app(config_name='default'):
     app = Flask(__name__)
@@ -25,6 +27,7 @@ def create_app(config_name='default'):
     login_manager.init_app(app)
     jwt.init_app(app)
     mail.init_app(app)
+    argon2.init_app(app)
     
     # Настройка логирования
     if not app.debug:

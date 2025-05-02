@@ -1,0 +1,26 @@
+:root {
+    /* Основная цветовая палитра */
+    --primary-color: #1A1B41;      /* Основной цвет */
+    --accent-color: #BAFF29;       /* Акцентный цвет */
+    --secondary-color: #6290C3;    /* Второстепенный цвет */
+    --light-color: #F1FFE7;        /* Светлый цвет */
+    --additional-color: #C2E7DA;   /* Дополнительный цвет */
+    
+    /* Функциональные цвета */
+    --text-primary: var(--primary-color);
+    --text-secondary: var(--secondary-color);
+    --text-light: var(--light-color);
+    --background-main: var(--light-color);
+    --background-accent: var(--additional-color);
+    --button-primary-bg: var(--primary-color);
+    --button-primary-text: var(--light-color);
+    --button-accent-bg: var(--accent-color);
+    --button-accent-text: var(--primary-color);
+    --footer-text: var(--secondary-color);
+    
+    /* Прозрачные версии для эффектов */
+    --primary-color-90: rgba(26, 27, 65, 0.9);
+    --accent-color-90: rgba(186, 255, 41, 0.9);
+    --primary-color-shadow: rgba(26, 27, 65, 0.2);
+    --accent-color-shadow: rgba(186, 255, 41, 0.2);
+} 

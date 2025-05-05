@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField, BooleanField, SelectField, HiddenField, SubmitField
+from wtforms.validators import DataRequired, Length, ValidationError
+import json
+
+class VacancyForm(FlaskForm):
+    """Форма для создания и редактирования вакансии"""
+    title = StringField('Название вакансии', validators=[
+        DataRequired(message='Введите название вакансии'),
+        Length(min=3, max=100, message='Название должно содержать от 3 до 100 символов')
+    ])
+    
+    id_c_employment_type = SelectField('Тип занятости', 
+        validators=[DataRequired(message='Выберите тип занятости')], 
+        coerce=int
+    )
+    
+    description_tasks = TextAreaField('Описание задач', validators=[
+        DataRequired(message='Введите описание задач'),
+        Length(min=50, message='Описание задач должно содержать минимум 50 символов')
+    ])
+    
+    description_conditions = TextAreaField('Условия работы', validators=[
+        DataRequired(message='Введите условия работы'),
+        Length(min=50, message='Условия работы должны содержать минимум 50 символов')
+    ])
+    
+    ideal_profile = TextAreaField('Идеальный кандидат', validators=[
+        DataRequired(message='Введите описание идеального кандидата'),
+        Length(min=50, message='Описание идеального кандидата должно содержать минимум 50 символов')
+    ])
+    
+    questions_json = HiddenField('Профессиональные вопросы')
+    soft_questions_json = HiddenField('Вопросы на soft skills')
+    
+    is_active = BooleanField('Активна')
+    
+    submit = SubmitField('Сохранить')
+    
+    def validate_questions_json(self, field):
+        """Валидация JSON с вопросами"""
+        if field.data:
+            try:
+                questions = json.loads(field.data)
+                if not isinstance(questions, list):
+                    raise ValidationError('Некорректный формат вопросов')
+                
+                for q in questions:
+                    if not isinstance(q, dict) or 'id' not in q or 'text' not in q:
+                        raise ValidationError('Некорректный формат вопроса')
+            except json.JSONDecodeError:
+                raise ValidationError('Некорректный JSON-формат') 

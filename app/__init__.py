@@ -47,7 +47,16 @@ def create_app(config_name='default'):
         os.makedirs(app.config['UPLOAD_FOLDER'])
     
     # Регистрация Blueprint'ов
-    from app.controllers.index import index_bp
-    app.register_blueprint(index_bp)
+    from app.controllers import register_blueprints
+    register_blueprints(app)
+    
+    # Настройка login_manager
+    login_manager.login_view = 'auth_bp.login'
+    login_manager.login_message = 'Пожалуйста, войдите в систему для доступа к этой странице.'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.models.user import User
+        return User.query.get(int(user_id))
     
     return app

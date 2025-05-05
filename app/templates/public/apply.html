@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4 px-lg-5">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('public_bp.index') }}">Главная</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('public_bp.vacancies') }}">Вакансии</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('public_bp.vacancy_detail', id=vacancy.id) }}">{{ vacancy.title }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Отклик</li>
+        </ol>
+    </nav>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">Отклик на вакансию: {{ vacancy.title }}</h2>
+                </div>
+                <div class="card-body">
+                    
+                    
+                    <div class="alert alert-info mb-4">
+                        <p class="mb-0"><i class="fas fa-info-circle me-2"></i> Поля, отмеченные <span class="text-danger">*</span>, обязательны для заполнения.</p>
+                    </div>
+                    
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.csrf_token }}
+                        
+                        <div class="mb-4 form-section">
+                            <h4 class="section-heading">Личная информация</h4>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    {{ form.full_name.label(class="form-label") }} <span class="text-danger">*</span>
+                                    {{ form.full_name(class="form-control" + (" is-invalid" if form.full_name.errors else "")) }}
+                                    {% if form.full_name.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.full_name.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    {{ form.email.label(class="form-label") }} <span class="text-danger">*</span>
+                                    {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+                                    {% if form.email.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.email.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    {{ form.phone.label(class="form-label") }} <span class="text-danger">*</span>
+                                    {{ form.phone(class="form-control" + (" is-invalid" if form.phone.errors else "")) }}
+                                    {% if form.phone.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.phone.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    {{ form.location.label(class="form-label") }} <span class="text-danger">*</span>
+                                    {{ form.location(class="form-control" + (" is-invalid" if form.location.errors else "")) }}
+                                    {% if form.location.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.location.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4 form-section">
+                            <h4 class="section-heading">Профессиональная информация</h4>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    {{ form.experience_years.label(class="form-label") }} <span class="text-danger">*</span>
+                                    {{ form.experience_years(class="form-control" + (" is-invalid" if form.experience_years.errors else "")) }}
+                                    {% if form.experience_years.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.experience_years.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Укажите сколько лет опыта у вас в данной сфере.</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    {{ form.education.label(class="form-label") }} <span class="text-danger">*</span>
+                                    {{ form.education(class="form-control" + (" is-invalid" if form.education.errors else "")) }}
+                                    {% if form.education.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.education.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    {{ form.desired_salary.label(class="form-label") }}
+                                    {{ form.desired_salary(class="form-control" + (" is-invalid" if form.desired_salary.errors else "")) }}
+                                    {% if form.desired_salary.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.desired_salary.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Укажите желаемую зарплату (опционально).</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if vacancy.questions_json %}
+                        <div class="mb-4 form-section">
+                            <h4 class="section-heading">Профессиональные вопросы</h4>
+                            {% for question in vacancy.questions_json %}
+                            <div class="question-block">
+                                <div class="mb-3">
+                                    {% set field_name = 'vacancy_question_' ~ question.id %}
+                                    <label class="form-label" for="{{ field_name }}">
+                                        {{ question.text }}
+                                        {% if question.required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {% if field_name in form._fields %}
+                                        {{ form[field_name](class="form-control" + (" is-invalid" if form[field_name].errors else ""), rows=3, id=field_name) }}
+                                        {% if form[field_name].errors %}
+                                            <div class="invalid-feedback">
+                                                {% for error in form[field_name].errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <textarea class="form-control" id="{{ field_name }}" name="{{ field_name }}" rows="3" 
+                                                  {% if question.required %}required{% endif %}></textarea>
+                                    {% endif %}
+                                    {% if question.help_text %}
+                                        <div class="form-text">{{ question.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if vacancy.soft_questions_json %}
+                        <div class="mb-4 form-section">
+                            <h4 class="section-heading">Личностные вопросы (Soft Skills)</h4>
+                            {% for question in vacancy.soft_questions_json %}
+                            <div class="question-block">
+                                <div class="mb-3">
+                                    {% set field_name = 'soft_question_' ~ question.id %}
+                                    <label class="form-label" for="{{ field_name }}">
+                                        {{ question.text }}
+                                        {% if question.required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {% if field_name in form._fields %}
+                                        {{ form[field_name](class="form-control" + (" is-invalid" if form[field_name].errors else ""), rows=3, id=field_name) }}
+                                        {% if form[field_name].errors %}
+                                            <div class="invalid-feedback">
+                                                {% for error in form[field_name].errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <textarea class="form-control" id="{{ field_name }}" name="{{ field_name }}" rows="3" 
+                                                  {% if question.required %}required{% endif %}></textarea>
+                                    {% endif %}
+                                    {% if question.help_text %}
+                                        <div class="form-text">{{ question.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-4 form-section">
+                            <h4 class="section-heading">Загрузите ваше резюме</h4>
+                            <div class="mb-3">
+                                {{ form.resume.label(class="form-label") }} <span class="text-danger">*</span>
+                                {{ form.resume(class="form-control" + (" is-invalid" if form.resume.errors else "")) }}
+                                {% if form.resume.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.resume.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Допустимые форматы: PDF, DOC, DOCX, JPG, PNG (максимум 5MB)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4 form-section">
+                            <h4 class="section-heading">Дополнительная информация</h4>
+                            <div class="mb-3">
+                                {{ form.cover_letter.label(class="form-label") }}
+                                {{ form.cover_letter(class="form-control" + (" is-invalid" if form.cover_letter.errors else ""), rows=5) }}
+                                {% if form.cover_letter.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.cover_letter.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Расскажите, почему вы заинтересованы в этой позиции и подходите для нее.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            {{ form.consent(class="form-check-input" + (" is-invalid" if form.consent.errors else "")) }}
+                            {{ form.consent.label(class="form-check-label") }} <span class="text-danger">*</span>
+                            {% if form.consent.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.consent.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-primary btn-lg") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">О вакансии</h4>
+                </div>
+                <div class="card-body">
+                    <h5>{{ vacancy.title }}</h5>
+                    <p class="mb-3"><i class="fas fa-briefcase me-2"></i>{{ vacancy.c_employment_type.name }}</p>
+                    <h6>Краткое описание:</h6>
+                    <p>{{ vacancy.description_tasks[:200] }}...</p>
+                    <a href="{{ url_for('public_bp.vacancy_detail', id=vacancy.id) }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-info-circle me-1"></i>Вернуться к деталям вакансии
+                    </a>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Процесс рассмотрения</h4>
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0">
+                        <li class="mb-2">После отправки заявки вы получите подтверждение по email.</li>
+                        <li class="mb-2">HR-менеджер рассмотрит ваше резюме в течение 2-3 рабочих дней.</li>
+                        <li class="mb-2">Если ваши навыки соответствуют требованиям, вам будет предложено пройти собеседование.</li>
+                        <li class="mb-2">Вы можете отслеживать статус заявки по коду, который будет предоставлен после отправки.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

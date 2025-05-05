@@ -1,17 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db
-from app.models import Vacancy, Candidate, C_Candidate_Status, Notification, SystemLog
-from sqlalchemy import func, desc, and_
+from app.models import Vacancy, Candidate, C_Candidate_Status, Notification, SystemLog, User, C_User_Status
+from app.controllers.auth import admin_required
+from sqlalchemy import func, desc, and_, cast
 import datetime
+import sqlalchemy as sa
+from flask import current_app
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 @dashboard_bp.route('/')
 @login_required
+@admin_required
 def index():
     """Главная страница дашборда"""
     # Статистика по системе
@@ -75,6 +79,7 @@ def index():
 
 @dashboard_bp.route('/statistics')
 @login_required
+@admin_required
 def statistics():
     """Страница с подробной статистикой"""
     # Данные по количеству кандидатов по датам
@@ -123,6 +128,7 @@ def statistics():
 
 @dashboard_bp.route('/api/chart_data')
 @login_required
+@admin_required
 def api_chart_data():
     """API для получения данных для графиков"""
     # Статистика по кандидатам по дням
@@ -169,4 +175,157 @@ def api_chart_data():
                 'backgroundColor': status_colors
             }]
         }
-    }) 
+    })
+
+@dashboard_bp.route('/users')
+@login_required
+@admin_required
+def users():
+    """Страница управления пользователями (только для администраторов)"""
+    # Получаем параметры фильтрации и пагинации
+    user_status_id = request.args.get('status', type=int)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    # Загружаем все статусы пользователей для фильтрации
+    statuses = C_User_Status.query.all()
+    
+    # Создаем базовый запрос с дешифрованием полей
+    base_query = db.session.query(
+        User.id,
+        User.full_name,
+        User._email.label('email_encrypted'),
+        User._phone.label('phone_encrypted'),
+        User.role,
+        User.company,
+        User.position,
+        User.id_c_user_status,
+        User.created_at,
+        C_User_Status.name.label('status_name')
+    ).join(
+        C_User_Status, User.id_c_user_status == C_User_Status.id
+    )
+    
+    # Применяем фильтр по статусу, если указан
+    if user_status_id:
+        base_query = base_query.filter(User.id_c_user_status == user_status_id)
+    
+    # Сортировка по дате создания (от новых к старым)
+    base_query = base_query.order_by(User.created_at.desc())
+    
+    # Получаем общее количество записей
+    total_items = base_query.count()
+    total_pages = (total_items + per_page - 1) // per_page  # округление вверх
+    
+    # Применяем пагинацию
+    users_subquery = base_query.limit(per_page).offset((page - 1) * per_page).subquery()
+    
+    # Получаем результаты с дешифровкой
+    db_users = db.session.query(
+        users_subquery.c.id,
+        users_subquery.c.full_name,
+        func.pgp_sym_decrypt(
+            cast(users_subquery.c.email_encrypted, sa.LargeBinary),
+            current_app.config['ENCRYPTION_KEY'],
+            current_app.config.get('ENCRYPTION_OPTIONS', '')
+        ).label('email'),
+        func.pgp_sym_decrypt(
+            cast(users_subquery.c.phone_encrypted, sa.LargeBinary),
+            current_app.config['ENCRYPTION_KEY'],
+            current_app.config.get('ENCRYPTION_OPTIONS', '')
+        ).label('phone'),
+        users_subquery.c.role,
+        users_subquery.c.company,
+        users_subquery.c.position,
+        users_subquery.c.id_c_user_status,
+        users_subquery.c.created_at,
+        users_subquery.c.status_name
+    ).all()
+    
+    # Преобразуем результаты в список словарей для шаблона
+    users = [{
+        'id': user.id,
+        'full_name': user.full_name,
+        'email': user.email,
+        'phone': user.phone,
+        'role': user.role,
+        'company': user.company,
+        'position': user.position,
+        'id_c_user_status': user.id_c_user_status,
+        'created_at': user.created_at.strftime('%d.%m.%Y %H:%M'),
+        'status_name': user.status_name
+    } for user in db_users]
+    
+    # Информация о пагинации
+    pagination = {
+        "current_page": page,
+        "total_pages": total_pages,
+        "total_items": total_items,
+        "per_page": per_page
+    }
+    
+    return render_template(
+        'dashboard/users.html',
+        users=users,
+        statuses=statuses,
+        current_status=user_status_id,
+        pagination=pagination
+    )
+
+@dashboard_bp.route('/approve-user/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def approve_user(user_id):
+    """Подтверждение заявки на регистрацию HR-менеджера"""
+    user = User.query.get_or_404(user_id)
+    
+    # Проверяем, что пользователь в статусе "Ожидает подтверждения"
+    if user.id_c_user_status != 2:  # Статус "Ожидает подтверждения"
+        flash('Пользователь не нуждается в подтверждении или уже подтвержден', 'warning')
+        return redirect(url_for('dashboard_bp.users'))
+    
+    # Меняем статус на "Активен"
+    user.id_c_user_status = 1  # Статус "Активен"
+    
+    # Логирование действия
+    log = SystemLog(
+        action='approve_user',
+        description=f'Подтверждение регистрации пользователя {user.full_name}',
+        ip_address=request.remote_addr,
+        user_id=current_user.id
+    )
+    
+    db.session.add(log)
+    db.session.commit()
+    
+    flash('Пользователь успешно подтвержден', 'success')
+    return redirect(url_for('dashboard_bp.users'))
+
+@dashboard_bp.route('/reject-user/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def reject_user(user_id):
+    """Отклонение заявки на регистрацию HR-менеджера"""
+    user = User.query.get_or_404(user_id)
+    
+    # Проверяем, что пользователь в статусе "Ожидает подтверждения"
+    if user.id_c_user_status != 2:  # Статус "Ожидает подтверждения"
+        flash('Пользователь не нуждается в подтверждении или уже обработан', 'warning')
+        return redirect(url_for('dashboard_bp.users'))
+    
+    # Меняем статус на "Отклонен"
+    user.id_c_user_status = 3  # Статус "Отклонен"
+    
+    # Логирование действия
+    log = SystemLog(
+        action='reject_user',
+        description=f'Отклонение регистрации пользователя {user.full_name}',
+        ip_address=request.remote_addr,
+        user_id=current_user.id
+    )
+    
+    db.session.add(log)
+    db.session.commit()
+    
+    flash('Регистрация пользователя отклонена', 'success')
+    return redirect(url_for('dashboard_bp.users')) 

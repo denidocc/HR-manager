@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort
+from flask_login import current_user
 from app import db
 from app.models import Vacancy, Candidate, Notification, SystemLog
 from app.forms.application import ApplicationForm
@@ -10,30 +11,62 @@ from app.utils.ai_service import request_ai_analysis
 import uuid
 import os
 from werkzeug.utils import secure_filename
+from wtforms import TextAreaField
+from wtforms.validators import DataRequired, Optional
 
-public_bp = Blueprint('public', __name__, url_prefix='')
+public_bp = Blueprint('public_bp', __name__, url_prefix='')
 
 @public_bp.route('/')
 def index():
     """Главная страница сайта"""
-    # Получаем только активные вакансии
-    active_vacancies = Vacancy.query.filter_by(is_active=True).all()
+    # Получаем только активные вакансии для отображения на главной
+    active_vacancies_count = Vacancy.query.filter_by(is_active=True).count()
     
     return render_template(
         'public/index.html',
-        vacancies=active_vacancies,
-        title='HR-система: Найдите работу своей мечты'
+        title='HRAI: Найдите работу своей мечты'
     )
 
 @public_bp.route('/vacancies')
 def vacancies():
     """Список доступных вакансий"""
-    # Получаем только активные вакансии
-    active_vacancies = Vacancy.query.filter_by(is_active=True).all()
+    # Получаем параметры поиска
+    search_query = request.args.get('search', '')
+    employment_type = request.args.get('employment_type', '')
+    
+    # Логирование для отладки
+    current_app.logger.info(f"Search parameters: search='{search_query}', employment_type='{employment_type}'")
+    
+    # Получаем все типы занятости для фильтра
+    from app.models import C_Employment_Type
+    employment_types = C_Employment_Type.query.all()
+    
+    # Базовый запрос: только активные вакансии
+    query = Vacancy.query.filter_by(is_active=True)
+    
+    # Применяем фильтры, если они указаны
+    if search_query:
+        # Поиск по названию и описанию
+        query = query.filter(
+            Vacancy.title.ilike(f'%{search_query}%') | 
+            Vacancy.description_tasks.ilike(f'%{search_query}%') |
+            Vacancy.ideal_profile.ilike(f'%{search_query}%')
+        )
+    
+    if employment_type and employment_type.isdigit():
+        # Используем id напрямую
+        employment_type_id = int(employment_type)
+        current_app.logger.info(f"Filtering by employment_type_id: {employment_type_id}")
+        query = query.filter_by(id_c_employment_type=employment_type_id)
+    
+    # Получаем результаты
+    active_vacancies = query.all()
+    current_app.logger.info(f"Found {len(active_vacancies)} matching vacancies")
     
     return render_template(
         'public/vacancies.html',
         vacancies=active_vacancies,
+        employment_types=employment_types,
         title='Доступные вакансии'
     )
 
@@ -45,7 +78,7 @@ def vacancy_detail(id):
     # Проверяем, активна ли вакансия
     if not vacancy.is_active:
         flash('Эта вакансия больше не доступна', 'warning')
-        return redirect(url_for('public.vacancies'))
+        return redirect(url_for('public_bp.vacancies'))
     
     return render_template(
         'public/vacancy_detail.html',
@@ -61,94 +94,165 @@ def apply(vacancy_id):
     # Проверяем, активна ли вакансия
     if not vacancy.is_active:
         flash('Эта вакансия больше не доступна', 'warning')
-        return redirect(url_for('public.vacancies'))
+        return redirect(url_for('public_bp.vacancies'))
     
     form = ApplicationForm()
     
-    if form.validate_on_submit():
-        # Сохраняем базовую информацию
-        tracking_code = str(uuid.uuid4())
-        
-        candidate = Candidate(
-            vacancy_id=vacancy.id,
-            full_name=form.full_name.data,
-            email=form.email.data,
-            phone=form.phone.data,
-            base_answers={
-                "location": form.location.data,
-                "experience_years": form.experience_years.data,
-                "education": form.education.data,
-                "desired_salary": form.desired_salary.data
-            },
-            vacancy_answers={},  # Будет заполнено из формы
-            soft_answers={},     # Будет заполнено из формы
-            id_c_candidate_status=0,  # "Новый" статус
-            tracking_code=tracking_code
-        )
-        
-        # Обрабатываем ответы на профессиональные вопросы
-        vacancy_answers = {}
+    # Регистрируем динамические поля для вопросов вакансии
+    if vacancy.questions_json:
+        for question in vacancy.questions_json:
+            question_id = str(question['id'])
+            field_name = f'vacancy_question_{question_id}'
+            if field_name not in form._fields:
+                # Создаем поле для вопроса
+                setattr(form, field_name, 
+                        TextAreaField(question['text'], 
+                                     validators=[DataRequired(message='Это поле обязательно для заполнения')] 
+                                     if question.get('required', False) else [Optional()]))
+    
+    if vacancy.soft_questions_json:
+        for question in vacancy.soft_questions_json:
+            question_id = str(question['id'])
+            field_name = f'soft_question_{question_id}'
+            if field_name not in form._fields:
+                # Создаем поле для вопроса
+                setattr(form, field_name, 
+                        TextAreaField(question['text'], 
+                                     validators=[DataRequired(message='Это поле обязательно для заполнения')] 
+                                     if question.get('required', False) else [Optional()]))
+    
+    if request.method == 'POST':
+        # Добавляем обработку полей, которые могут быть не зарегистрированы в форме
+        # (например, если они были добавлены напрямую в шаблоне)
         if vacancy.questions_json:
             for question in vacancy.questions_json:
                 question_id = str(question['id'])
                 field_name = f'vacancy_question_{question_id}'
-                if field_name in form.data:
-                    vacancy_answers[question_id] = form.data[field_name]
+                if field_name not in form._fields and field_name in request.form:
+                    # Если поле есть в запросе, но не в форме, добавляем его
+                    setattr(form, field_name, 
+                            TextAreaField(question['text'], 
+                                         validators=[DataRequired(message='Это поле обязательно для заполнения')] 
+                                         if question.get('required', False) else [Optional()]))
+                    # Устанавливаем значение из запроса
+                    getattr(form, field_name).data = request.form.get(field_name)
         
-        candidate.vacancy_answers = vacancy_answers
-        
-        # Обрабатываем ответы на soft-skill вопросы
-        soft_answers = {}
         if vacancy.soft_questions_json:
             for question in vacancy.soft_questions_json:
                 question_id = str(question['id'])
                 field_name = f'soft_question_{question_id}'
-                if field_name in form.data:
-                    soft_answers[question_id] = form.data[field_name]
-        
-        candidate.soft_answers = soft_answers
-        
-        # Обрабатываем загрузку резюме
-        if form.resume.data:
-            resume_file = form.resume.data
-            filename = save_resume(resume_file, tracking_code)
+                if field_name not in form._fields and field_name in request.form:
+                    # Если поле есть в запросе, но не в форме, добавляем его
+                    setattr(form, field_name, 
+                            TextAreaField(question['text'], 
+                                         validators=[DataRequired(message='Это поле обязательно для заполнения')] 
+                                         if question.get('required', False) else [Optional()]))
+                    # Устанавливаем значение из запроса
+                    getattr(form, field_name).data = request.form.get(field_name)
+    
+    if form.validate_on_submit():
+        try:
+            # Сохраняем базовую информацию
+            tracking_code = str(uuid.uuid4())
             
-            if filename:
-                candidate.resume_path = filename
+            candidate = Candidate(
+                vacancy_id=vacancy.id,
+                full_name=form.full_name.data,
+                email=form.email.data,
+                phone=form.phone.data,
+                base_answers={
+                    "location": form.location.data,
+                    "experience_years": form.experience_years.data,
+                    "education": form.education.data,
+                    "desired_salary": form.desired_salary.data if form.desired_salary.data else None
+                },
+                vacancy_answers={},  # Будет заполнено из формы
+                soft_answers={},     # Будет заполнено из формы
+                id_c_candidate_status=1,  # "Новый" статус (обычно = 1)
+                tracking_code=tracking_code
+            )
+            
+            # Обрабатываем ответы на профессиональные вопросы
+            vacancy_answers = {}
+            if vacancy.questions_json:
+                for question in vacancy.questions_json:
+                    question_id = str(question['id'])
+                    field_name = f'vacancy_question_{question_id}'
+                    # Проверяем сначала в форме, потом напрямую в request.form
+                    if hasattr(form, field_name) and getattr(form, field_name).data:
+                        vacancy_answers[question_id] = getattr(form, field_name).data
+                    elif field_name in request.form and request.form.get(field_name).strip():
+                        vacancy_answers[question_id] = request.form.get(field_name).strip()
+            
+            candidate.vacancy_answers = vacancy_answers
+            
+            # Обрабатываем ответы на soft-skill вопросы
+            soft_answers = {}
+            if vacancy.soft_questions_json:
+                for question in vacancy.soft_questions_json:
+                    question_id = str(question['id'])
+                    field_name = f'soft_question_{question_id}'
+                    # Проверяем сначала в форме, потом напрямую в request.form
+                    if hasattr(form, field_name) and getattr(form, field_name).data:
+                        soft_answers[question_id] = getattr(form, field_name).data
+                    elif field_name in request.form and request.form.get(field_name).strip():
+                        soft_answers[question_id] = request.form.get(field_name).strip()
+            
+            candidate.soft_answers = soft_answers
+            
+            # Обрабатываем загрузку резюме
+            if form.resume.data:
+                resume_file = form.resume.data
+                filename = save_resume(resume_file, tracking_code)
                 
-                # Извлекаем текст из резюме
-                resume_text = extract_text_from_resume(filename)
-                if resume_text:
-                    candidate.resume_text = resume_text
+                if filename:
+                    candidate.resume_path = filename
+                    
+                    # Извлекаем текст из резюме
+                    resume_text = extract_text_from_resume(filename)
+                    if resume_text:
+                        candidate.resume_text = resume_text
+            
+            # Сохраняем кандидата
+            db.session.add(candidate)
+            db.session.commit()
+            
+            # Создаем уведомление о новой заявке
+            notification = Notification(
+                candidate_id=candidate.id,
+                type="application_received",
+                message=f"Ваша заявка на вакансию '{vacancy.title}' принята. Мы свяжемся с вами после рассмотрения."
+            )
+            db.session.add(notification)
+            db.session.commit()
+            
+            # Логируем создание кандидата
+            SystemLog.log(
+                event_type="candidate_created",
+                description=f"Создан новый кандидат: {candidate.full_name} на вакансию {vacancy.title}",
+                ip_address=request.remote_addr
+            )
+            
+            # Запускаем AI-анализ в фоновом режиме, если настроено
+            if hasattr(candidate, 'resume_text') and candidate.resume_text and 'ai_analysis' in current_app.config.get('ENABLED_FEATURES', []):
+                try:
+                    request_ai_analysis(candidate)
+                except Exception as e:
+                    current_app.logger.error(f"Ошибка при запуске AI-анализа: {str(e)}")
+            
+            flash('Ваша заявка успешно отправлена! Используйте код отслеживания для проверки статуса.', 'success')
+            return redirect(url_for('public_bp.application_success', tracking_code=tracking_code))
         
-        db.session.add(candidate)
-        db.session.commit()
-        
-        # Создаем уведомление о новой заявке
-        notification = Notification(
-            candidate_id=candidate.id,
-            type="application_received",
-            message=f"Ваша заявка на вакансию '{vacancy.title}' принята. Мы свяжемся с вами после рассмотрения."
-        )
-        db.session.add(notification)
-        db.session.commit()
-        
-        # Логируем создание кандидата
-        SystemLog.log(
-            event_type="candidate_created",
-            description=f"Создан новый кандидат: {candidate.full_name} на вакансию {vacancy.title}",
-            ip_address=request.remote_addr
-        )
-        
-        # Запускаем AI-анализ в фоновом режиме (если есть текст резюме)
-        if candidate.resume_text:
-            try:
-                request_ai_analysis(candidate)
-            except Exception as e:
-                current_app.logger.error(f"Ошибка при запуске AI-анализа: {str(e)}")
-        
-        flash('Ваша заявка успешно отправлена! Используйте код отслеживания для проверки статуса.', 'success')
-        return redirect(url_for('public.application_success', tracking_code=tracking_code))
+        except Exception as e:
+            # Откатываем транзакцию в случае ошибки
+            db.session.rollback()
+            current_app.logger.error(f"Ошибка при сохранении заявки: {str(e)}")
+            flash('Произошла ошибка при отправке заявки. Пожалуйста, попробуйте еще раз.', 'danger')
+    
+    # Если есть ошибки валидации, выводим их
+    if form.errors:
+        # Выводим только общую ошибку, без деталей по каждому полю
+        flash('Пожалуйста, исправьте ошибки в форме и попробуйте снова.', 'danger')
     
     return render_template(
         'public/apply.html',
@@ -184,15 +288,26 @@ def track_result():
     
     if not tracking_code:
         flash('Пожалуйста, введите код отслеживания', 'warning')
-        return redirect(url_for('public.track'))
+        return redirect(url_for('public_bp.track'))
     
     candidate = Candidate.query.filter_by(tracking_code=tracking_code).first()
     
     if not candidate:
         flash('Заявка с указанным кодом не найдена', 'danger')
-        return redirect(url_for('public.track'))
+        return redirect(url_for('public_bp.track'))
     
-    return redirect(url_for('candidates.track', tracking_code=tracking_code))
+    return redirect(url_for('public_bp.candidate_status', tracking_code=tracking_code))
+
+@public_bp.route('/status/<tracking_code>')
+def candidate_status(tracking_code):
+    """Страница статуса заявки кандидата"""
+    candidate = Candidate.query.filter_by(tracking_code=tracking_code).first_or_404()
+    
+    return render_template(
+        'public/candidate_status.html',
+        candidate=candidate,
+        title='Статус заявки'
+    )
 
 @public_bp.route('/about')
 def about():

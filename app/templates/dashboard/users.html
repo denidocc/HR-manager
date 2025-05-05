@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="section-heading">Управление пользователями</h1>
+            <p class="text-muted">Просмотр и управление всеми пользователями системы</p>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Список пользователей</h4>
+                    <div>
+                        <a href="{{ url_for('auth_bp.register') }}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus me-1"></i>Добавить пользователя
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Фильтры -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <form method="get" class="d-flex">
+                                <select name="status" class="form-select me-2">
+                                    <option value="">Все статусы</option>
+                                    {% for status in statuses %}
+                                    <option value="{{ status.id }}" {% if current_status == status.id %}selected{% endif %}>
+                                        {{ status.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-primary">Применить</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Таблица пользователей -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Имя</th>
+                                    <th>Email</th>
+                                    <th>Телефон</th>
+                                    <th>Роль</th>
+                                    <th>Компания</th>
+                                    <th>Должность</th>
+                                    <th>Статус</th>
+                                    <th>Дата регистрации</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.full_name }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>{{ user.phone }}</td>
+                                    <td>
+                                        {% if user.role == 'admin' %}
+                                        <span class="badge bg-danger">Администратор</span>
+                                        {% elif user.role == 'hr' %}
+                                        <span class="badge bg-primary">HR-менеджер</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ user.role }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.company or '-' }}</td>
+                                    <td>{{ user.position or '-' }}</td>
+                                    <td>
+                                        {% if user.id_c_user_status == 1 %}
+                                        <span class="badge bg-success">Активен</span>
+                                        {% elif user.id_c_user_status == 2 %}
+                                        <span class="badge bg-warning">Ожидает подтверждения</span>
+                                        {% elif user.id_c_user_status == 3 %}
+                                        <span class="badge bg-danger">Отклонен</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ user.status_name }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.created_at }}</td>
+                                    <td>
+                                        {% if user.id_c_user_status == 2 %}
+                                        <div class="btn-group">
+                                            <form method="post" action="{{ url_for('dashboard_bp.approve_user', user_id=user.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-success me-1" title="Подтвердить">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="{{ url_for('dashboard_bp.reject_user', user_id=user.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Отклонить">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                        {% else %}
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Нет действий</button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="9" class="text-center py-4">Нет пользователей, соответствующих выбранным критериям</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Пагинация -->
+                    {% if pagination and pagination.total_pages > 1 %}
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div>
+                            <span class="text-muted">Показано {{ users|length }} из {{ pagination.total_items }} пользователей</span>
+                        </div>
+                        <nav aria-label="Навигация по страницам">
+                            <ul class="pagination">
+                                <li class="page-item {% if pagination.current_page == 1 %}disabled{% endif %}">
+                                    <a class="page-link" href="{{ url_for('dashboard_bp.users', page=pagination.current_page-1, status=current_status) }}" aria-label="Предыдущая">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                                
+                                {% set start_page = [1, pagination.current_page - 2]|max %}
+                                {% set end_page = [pagination.total_pages, pagination.current_page + 2]|min %}
+                                
+                                {% if start_page > 1 %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('dashboard_bp.users', page=1, status=current_status) }}">1</a>
+                                </li>
+                                {% if start_page > 2 %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                {% endif %}
+                                {% endif %}
+                                
+                                {% for page_num in range(start_page, end_page + 1) %}
+                                <li class="page-item {% if page_num == pagination.current_page %}active{% endif %}">
+                                    <a class="page-link" href="{{ url_for('dashboard_bp.users', page=page_num, status=current_status) }}">{{ page_num }}</a>
+                                </li>
+                                {% endfor %}
+                                
+                                {% if end_page < pagination.total_pages %}
+                                {% if end_page < pagination.total_pages - 1 %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                {% endif %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('dashboard_bp.users', page=pagination.total_pages, status=current_status) }}">{{ pagination.total_pages }}</a>
+                                </li>
+                                {% endif %}
+                                
+                                <li class="page-item {% if pagination.current_page == pagination.total_pages %}disabled{% endif %}">
+                                    <a class="page-link" href="{{ url_for('dashboard_bp.users', page=pagination.current_page+1, status=current_status) }}" aria-label="Следующая">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

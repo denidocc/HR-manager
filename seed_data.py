@@ -40,11 +40,46 @@ def create_c_gender():
 
 def create_c_user_status():
     """Создание справочника статусов пользователей"""
-    statuses = ['Неизвестно', 'Активный', 'Неактивный', 'Заблокирован', 'Удален']
-    for i, status in enumerate(statuses):
-        create_if_not_exists(C_User_Status, status, i)
-    db.session.commit()
-    print("Справочник статусов пользователей успешно создан")
+    # Запрашиваем все существующие статусы
+    existing_statuses = {}
+    for status in C_User_Status.query.all():
+        existing_statuses[status.name] = status
+    
+    # Определяем нужные статусы
+    statuses = [
+        {'id': 0, 'name': 'Неизвестно', 'description': 'Статус не определен'},
+        {'id': 1, 'name': 'Активный', 'description': 'Пользователь активен'},
+        {'id': 2, 'name': 'Ожидает подтверждения', 'description': 'Пользователь ожидает активации администратором'},
+        {'id': 3, 'name': 'Отклонен', 'description': 'Заявка пользователя отклонена администратором'},
+        {'id': 4, 'name': 'Неактивный', 'description': 'Пользователь временно неактивен'},
+        {'id': 5, 'name': 'Заблокирован', 'description': 'Пользователь заблокирован'},
+        {'id': 6, 'name': 'Удален', 'description': 'Пользователь удален из системы'}
+    ]
+    
+    # Обновляем существующие или создаем новые
+    for status_data in statuses:
+        if status_data['name'] in existing_statuses:
+            # Обновляем существующий статус, если нужно
+            status = existing_statuses[status_data['name']]
+            if status.description != status_data['description']:
+                status.description = status_data['description']
+            # Пропускаем обновление ID, так как оно может вызвать конфликты
+        else:
+            # Создаем новый статус
+            new_status = C_User_Status(
+                id=status_data['id'],
+                name=status_data['name'],
+                description=status_data['description']
+            )
+            db.session.add(new_status)
+    
+    # Сохраняем изменения
+    try:
+        db.session.commit()
+        print("Справочник статусов пользователей успешно обновлен")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Ошибка при обновлении справочника статусов пользователей: {e}")
 
 def create_c_candidate_status():
     """Создание справочника статусов кандидатов"""

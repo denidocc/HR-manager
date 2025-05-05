@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="section-heading"><i class="fas fa-chart-bar me-2"></i>Статистика</h1>
+            <p class="text-muted">Подробная статистика и аналитика по рекрутинговому процессу</p>
+        </div>
+    </div>
+    
+    <!-- Графики и аналитика -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Динамика получения заявок</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="applicationsChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Статистика по вакансиям -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Распределение кандидатов по вакансиям и статусам</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Вакансия</th>
+                                    {% for status in statuses %}
+                                    <th style="background-color: {{ status.color_code }}20">{{ status.name }}</th>
+                                    {% endfor %}
+                                    <th>Всего</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vacancy_data in vacancy_status_data %}
+                                <tr>
+                                    <td><strong>{{ vacancy_data.name }}</strong></td>
+                                    {% set total = 0 %}
+                                    {% for status_data in vacancy_data.data %}
+                                        <td>
+                                            <span class="badge" style="background-color: {{ status_data.color }}">
+                                                {{ status_data.count }}
+                                            </span>
+                                        </td>
+                                        {% set total = total + status_data.count %}
+                                    {% endfor %}
+                                    <td><strong>{{ total }}</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI-анализ -->
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3>AI-подбор кандидатов</h3>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-center mb-4">
+                        <div class="ai-match-indicator">
+                            <div class="percentage">
+                                <span class="value">{{ avg_match|round }}</span><span class="symbol">%</span>
+                            </div>
+                            <div class="label">Средний процент совпадения</div>
+                        </div>
+                    </div>
+                    <p class="text-center text-muted">Средний показатель соответствия кандидатов требованиям вакансий по анализу AI</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Возрастная демография</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="demographicsChart" width="400" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Данные для графика заявок
+    const dates = {{ dates_data|tojson }};
+    const labels = dates.map(item => item.date);
+    const data = dates.map(item => item.count);
+    
+    // График заявок
+    const applicationsChart = new Chart(
+        document.getElementById('applicationsChart'),
+        {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Полученные заявки',
+                    data: data,
+                    fill: true,
+                    backgroundColor: 'rgba(98, 144, 195, 0.2)',
+                    borderColor: 'rgba(98, 144, 195, 1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Динамика поступления заявок'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        }
+    );
+    
+    // Демографический график (заглушка для демонстрации)
+    const demographicsChart = new Chart(
+        document.getElementById('demographicsChart'),
+        {
+            type: 'doughnut',
+            data: {
+                labels: ['18-25', '26-35', '36-45', '46+'],
+                datasets: [{
+                    label: 'Возрастные группы',
+                    data: [15, 45, 30, 10],
+                    backgroundColor: [
+                        'rgba(186, 255, 41, 0.7)',
+                        'rgba(98, 144, 195, 0.7)',
+                        'rgba(26, 27, 65, 0.7)',
+                        'rgba(194, 231, 218, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(186, 255, 41, 1)',
+                        'rgba(98, 144, 195, 1)',
+                        'rgba(26, 27, 65, 1)',
+                        'rgba(194, 231, 218, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Возрастные группы кандидатов'
+                    }
+                }
+            }
+        }
+    );
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .ai-match-indicator {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        background: linear-gradient(to right, #ff9d00, #BAFF29);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .ai-match-indicator .percentage {
+        font-size: 2.5rem;
+        font-weight: bold;
+        line-height: 1;
+    }
+    
+    .ai-match-indicator .percentage .symbol {
+        font-size: 1.5rem;
+    }
+    
+    .ai-match-indicator .label {
+        font-size: 0.8rem;
+        text-align: center;
+        max-width: 120px;
+        margin-top: 0.5rem;
+    }
+</style>
+{% endblock %} 

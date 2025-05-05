@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1 class="section-heading mb-4">Свяжитесь с нами</h1>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="mb-0">Контактная информация</h3>
+                </div>
+                <div class="card-body">
+                    <div class="contact-info">
+                        <div class="contact-item mb-4">
+                            <h4><i class="fas fa-map-marker-alt me-2 text-primary"></i>Адрес</h4>
+                            <p class="mb-0">г. Москва, ул. Примерная, 123<br>123456</p>
+                        </div>
+                        
+                        <div class="contact-item mb-4">
+                            <h4><i class="fas fa-phone me-2 text-primary"></i>Телефон</h4>
+                            <p class="mb-0">+7 (123) 456-78-90</p>
+                        </div>
+                        
+                        <div class="contact-item mb-4">
+                            <h4><i class="fas fa-envelope me-2 text-primary"></i>Email</h4>
+                            <p class="mb-0">
+                                Общие вопросы: <a href="mailto:info@hr-system.com">info@hr-system.com</a><br>
+                                Поддержка: <a href="mailto:support@hr-system.com">support@hr-system.com</a><br>
+                                HR отдел: <a href="mailto:hr@hr-system.com">hr@hr-system.com</a>
+                            </p>
+                        </div>
+                        
+                        <div class="contact-item">
+                            <h4><i class="fas fa-clock me-2 text-primary"></i>Рабочие часы</h4>
+                            <p class="mb-0">
+                                Понедельник-Пятница: 09:00 - 18:00<br>
+                                Суббота-Воскресенье: Выходной
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">Социальные сети</h3>
+                </div>
+                <div class="card-body">
+                    <p>Следите за нами в социальных сетях, чтобы быть в курсе последних новостей и обновлений:</p>
+                    
+                    <div class="social-links d-flex gap-3 mt-3">
+                        <a href="#" class="btn btn-outline-primary"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" class="btn btn-outline-primary"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="btn btn-outline-primary"><i class="fab fa-linkedin-in"></i></a>
+                        <a href="#" class="btn btn-outline-primary"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="btn btn-outline-primary"><i class="fab fa-youtube"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">Отправить сообщение</h3>
+                </div>
+                <div class="card-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Имя</label>
+                            <input type="text" class="form-control" id="name" placeholder="Введите ваше имя" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" placeholder="Введите ваш email" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Тема</label>
+                            <input type="text" class="form-control" id="subject" placeholder="Введите тему сообщения" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="message" class="form-label">Сообщение</label>
+                            <textarea class="form-control" id="message" rows="5" placeholder="Введите ваше сообщение" required></textarea>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="privacy" required>
+                            <label class="form-check-label" for="privacy">Я согласен с <a href="#">Политикой конфиденциальности</a></label>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-2"></i>Отправить сообщение
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">Наш офис на карте</h3>
+                </div>
+                <div class="card-body">
+                    <div class="map-container">
+                        <!-- Здесь может быть iframe с картой -->
+                        <div class="bg-light p-5 text-center">
+                            <i class="fas fa-map-marked-alt fa-3x mb-3 text-primary"></i>
+                            <h4>Карта офиса</h4>
+                            <p>Интерактивная карта будет добавлена позднее.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

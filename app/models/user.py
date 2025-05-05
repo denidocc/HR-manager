@@ -14,6 +14,8 @@ class User(UserMixin, db.Model):
     password_hash: so.Mapped[str] = so.mapped_column(sa.Text, nullable=False)
     role: so.Mapped[str] = so.mapped_column(sa.Text, nullable=False)
     full_name: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
+    company: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
+    position: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     id_c_gender: so.Mapped[int] = so.mapped_column(sa.Integer, sa.ForeignKey('c_gender.id'), index=True, nullable=True)
     id_c_user_status: so.Mapped[int] = so.mapped_column(sa.Integer, sa.ForeignKey('c_user_status.id'), index=True, default=1)
     created_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -53,6 +55,8 @@ class User(UserMixin, db.Model):
             'phone': self.phone,
             'role': self.role,
             'full_name': self.full_name,
+            'company': self.company,
+            'position': self.position,
             'gender': self.c_gender.name if self.c_gender else None,
             'status': self.c_user_status.name if self.c_user_status else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,

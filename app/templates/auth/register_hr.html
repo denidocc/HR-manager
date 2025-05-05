@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0" style="color: var(--primary-color) !important;"><i class="fas fa-user-plus me-2"></i>Регистрация HR-менеджера</h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    Заполните форму ниже для регистрации в качестве HR-менеджера. 
+                    После проверки ваших данных администратором, вы получите доступ к системе.
+                </p>
+                
+                <form method="POST" action="{{ url_for('auth_bp.register_hr') }}">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="first_name" class="form-label">Имя</label>
+                            {{ form.first_name(class="form-control" + (" is-invalid" if form.first_name.errors else ""), placeholder="Введите ваше имя") }}
+                            {% if form.first_name.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.first_name.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="last_name" class="form-label">Фамилия</label>
+                            {{ form.last_name(class="form-control" + (" is-invalid" if form.last_name.errors else ""), placeholder="Введите вашу фамилию") }}
+                            {% if form.last_name.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.last_name.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="email" class="form-label">Email</label>
+                            {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), placeholder="Введите email для входа в систему") }}
+                            {% if form.email.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.email.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="phone" class="form-label">Телефон</label>
+                            {{ form.phone(class="form-control" + (" is-invalid" if form.phone.errors else ""), placeholder="Введите ваш номер телефона") }}
+                            {% if form.phone.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.phone.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="password" class="form-label">Пароль</label>
+                            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else ""), placeholder="Минимум 8 символов") }}
+                            {% if form.password.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.password.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="password2" class="form-label">Повторите пароль</label>
+                            {{ form.password2(class="form-control" + (" is-invalid" if form.password2.errors else ""), placeholder="Введите пароль еще раз") }}
+                            {% if form.password2.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.password2.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="company" class="form-label">Компания</label>
+                            {{ form.company(class="form-control" + (" is-invalid" if form.company.errors else ""), placeholder="Название вашей компании") }}
+                            {% if form.company.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.company.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="position" class="form-label">Должность</label>
+                            {{ form.position(class="form-control" + (" is-invalid" if form.position.errors else ""), placeholder="Ваша должность") }}
+                            {% if form.position.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.position.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4 form-check">
+                        {{ form.consent(class="form-check-input" + (" is-invalid" if form.consent.errors else "")) }}
+                        <label class="form-check-label" for="consent">
+                            Я согласен с <a href="#" target="_blank">условиями использования сервиса</a>
+                        </label>
+                        {% if form.consent.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.consent.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer">
+                <div class="text-center">
+                    <span>Уже зарегистрированы?</span>
+                    <a href="{{ url_for('auth_bp.login') }}" class="text-decoration-none">Войти в систему</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

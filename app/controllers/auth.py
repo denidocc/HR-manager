@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
 from app import db, argon2
 from app.models.user import User
 from app.models.system_log import SystemLog
-from app.forms.auth import LoginForm, RegisterForm, ResetPasswordRequestForm, ResetPasswordForm
+from app.forms.auth import LoginForm, RegisterForm, ResetPasswordRequestForm, ResetPasswordForm, PublicRegisterForm
 from app.utils.email_service import send_password_reset_email
 from functools import wraps
+from sqlalchemy import func, cast
+import sqlalchemy as sa
 
 auth_bp = Blueprint('auth_bp', __name__, url_prefix='/auth')
 
@@ -31,8 +33,14 @@ def login():
     
     form = LoginForm()
     if form.validate_on_submit():
-        # Используем email свойство, которое декодирует из _email
-        user = User.query.filter(User.email == form.email.data).first()
+        # Ищем пользователя с указанным email через дешифрование значения в базе
+        user = db.session.query(User).filter(
+            func.pgp_sym_decrypt(
+                cast(User._email, sa.LargeBinary),
+                current_app.config['ENCRYPTION_KEY'],
+                current_app.config.get('ENCRYPTION_OPTIONS', '')
+            ) == form.email.data
+        ).first()
         
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
@@ -48,7 +56,7 @@ def login():
             next_page = request.args.get('next')
             if next_page:
                 return redirect(next_page)
-            return redirect(url_for('dashboard_bp.index'))
+            return redirect(url_for('dashboard.index'))
         
         flash('Неверный email или пароль', 'danger')
     
@@ -87,6 +95,53 @@ def register():
     
     return render_template('auth/register.html', form=form, title='Регистрация пользователя')
 
+@auth_bp.route('/register-hr', methods=['GET', 'POST'])
+def register_hr():
+    """Публичная регистрация нового HR-менеджера"""
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard_bp.index'))
+    
+    form = PublicRegisterForm()
+    
+    if form.validate_on_submit():
+        # Проверяем, существует ли пользователь с таким email через дешифрование
+        user = db.session.query(User).filter(
+            func.pgp_sym_decrypt(
+                cast(User._email, sa.LargeBinary),
+                current_app.config['ENCRYPTION_KEY'],
+                current_app.config.get('ENCRYPTION_OPTIONS', '')
+            ) == form.email.data
+        ).first()
+        
+        if user:
+            flash('Email уже зарегистрирован в системе', 'danger')
+        else:
+            # Создаем нового пользователя
+            user = User()
+            user.email = form.email.data
+            user.set_password(form.password.data)
+            user.role = 'hr'  # По умолчанию роль HR
+            user.full_name = f"{form.first_name.data} {form.last_name.data}"
+            user.company = form.company.data
+            user.position = form.position.data
+            user.id_c_user_status = 2  # Статус "Ожидает подтверждения"
+            
+            # Сохраняем в базу
+            db.session.add(user)
+            db.session.commit()
+            
+            # Логирование регистрации
+            SystemLog.log(
+                event_type="user_register_public",
+                description=f"Публичная регистрация нового HR-менеджера: {user.full_name}",
+                ip_address=request.remote_addr
+            )
+            
+            flash('Ваша заявка на регистрацию успешно отправлена. После проверки администратором вы получите доступ к системе.', 'success')
+            return redirect(url_for('auth_bp.login'))
+    
+    return render_template('auth/register_hr.html', form=form, title='Регистрация HR-менеджера')
+
 @auth_bp.route('/logout')
 @login_required
 def logout():
@@ -110,7 +165,15 @@ def reset_password_request():
     
     form = ResetPasswordRequestForm()
     if form.validate_on_submit():
-        user = User.query.filter(User.email == form.email.data).first()
+        # Ищем пользователя с указанным email через дешифрование
+        user = db.session.query(User).filter(
+            func.pgp_sym_decrypt(
+                cast(User._email, sa.LargeBinary),
+                current_app.config['ENCRYPTION_KEY'],
+                current_app.config.get('ENCRYPTION_OPTIONS', '')
+            ) == form.email.data
+        ).first()
+        
         if user:
             send_password_reset_email(user)
             

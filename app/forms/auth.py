@@ -49,13 +49,61 @@ class ResetPasswordRequestForm(FlaskForm):
             raise ValidationError('Пользователь с таким email не найден')
 
 class ResetPasswordForm(FlaskForm):
-    """Форма для сброса пароля"""
+    """Форма изменения пароля после сброса"""
     password = PasswordField('Новый пароль', validators=[
-        DataRequired(),
-        Length(min=8, message='Пароль должен содержать минимум 8 символов')
+        DataRequired(message='Введите новый пароль'),
+        Length(min=8, message='Пароль должен содержать не менее 8 символов')
     ])
     password2 = PasswordField('Повторите пароль', validators=[
-        DataRequired(),
+        DataRequired(message='Повторите пароль'),
         EqualTo('password', message='Пароли должны совпадать')
     ])
-    submit = SubmitField('Сохранить новый пароль') 
+    submit = SubmitField('Сохранить пароль')
+
+class PublicRegisterForm(FlaskForm):
+    """Форма публичной регистрации HR-менеджера"""
+    first_name = StringField('Имя', validators=[
+        DataRequired(message='Введите ваше имя'),
+        Length(min=2, max=50, message='Имя должно содержать от 2 до 50 символов')
+    ])
+    
+    last_name = StringField('Фамилия', validators=[
+        DataRequired(message='Введите вашу фамилию'),
+        Length(min=2, max=50, message='Фамилия должна содержать от 2 до 50 символов')
+    ])
+    
+    email = StringField('Email', validators=[
+        DataRequired(message='Введите email'),
+        Email(message='Введите корректный email')
+    ])
+    
+    phone = StringField('Телефон', validators=[
+        DataRequired(message='Введите ваш телефон'),
+        Length(min=10, max=20, message='Введите корректный номер телефона')
+    ])
+    
+    password = PasswordField('Пароль', validators=[
+        DataRequired(message='Введите пароль'),
+        Length(min=8, message='Пароль должен содержать не менее 8 символов')
+    ])
+    
+    password2 = PasswordField('Повторите пароль', validators=[
+        DataRequired(message='Повторите пароль'),
+        EqualTo('password', message='Пароли должны совпадать')
+    ])
+    
+    company = StringField('Компания', validators=[
+        DataRequired(message='Введите название компании'),
+        Length(min=2, max=100, message='Название компании должно содержать от 2 до 100 символов')
+    ])
+    
+    position = StringField('Должность', validators=[
+        DataRequired(message='Введите вашу должность'),
+        Length(min=2, max=100, message='Должность должна содержать от 2 до 100 символов')
+    ])
+    
+    consent = BooleanField('Я согласен с условиями использования сервиса', validators=[
+        DataRequired(message='Необходимо принять условия использования')
+    ])
+    
+    submit = SubmitField('Зарегистрироваться') 

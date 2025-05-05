@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">
+                        <i class="fas fa-clipboard-check me-2"></i>Статус заявки
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="application-info mb-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h4>{{ candidate.vacancy.title }}</h4>
+                                <p class="text-muted">Заявка подана: {{ candidate.created_at.strftime('%d.%m.%Y') }}</p>
+                            </div>
+                            <span class="badge bg-primary px-3 py-2">{{ candidate.c_candidate_status.name }}</span>
+                        </div>
+                        <div class="tracking-id mt-2">
+                            <small class="text-muted">Код отслеживания: {{ candidate.tracking_code }}</small>
+                        </div>
+                    </div>
+                    
+                    <div class="status-timeline p-3 bg-light rounded mb-4">
+                        <h4 class="section-heading">Этапы рассмотрения</h4>
+                        
+                        <ul class="timeline">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 1 else '' }}">
+                                <span class="timeline-point"></span>
+                                <div class="timeline-content">
+                                    <h5>Заявка подана</h5>
+                                    <p>Ваша заявка получена и зарегистрирована в системе</p>
+                                    {% if candidate.id_c_candidate_status >= 1 %}
+                                        <small class="text-muted">{{ candidate.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                                    {% endif %}
+                                </div>
+                            </li>
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 2 else '' }}">
+                                <span class="timeline-point"></span>
+                                <div class="timeline-content">
+                                    <h5>Рассмотрение резюме</h5>
+                                    <p>HR-менеджер изучает вашу заявку и резюме</p>
+                                    {% if candidate.id_c_candidate_status >= 2 %}
+                                        <small class="text-muted">В процессе</small>
+                                    {% endif %}
+                                </div>
+                            </li>
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 3 else '' }}">
+                                <span class="timeline-point"></span>
+                                <div class="timeline-content">
+                                    <h5>Интервью</h5>
+                                    <p>Приглашение на интервью с HR и техническими специалистами</p>
+                                    {% if candidate.id_c_candidate_status >= 3 and candidate.interview_date %}
+                                        <small class="text-muted">Запланировано на: {{ candidate.interview_date.strftime('%d.%m.%Y %H:%M') }}</small>
+                                    {% endif %}
+                                </div>
+                            </li>
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 4 else '' }}">
+                                <span class="timeline-point"></span>
+                                <div class="timeline-content">
+                                    <h5>Решение</h5>
+                                    <p>Финальное решение по вашей кандидатуре</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    {% if candidate.notifications %}
+                    <div class="notifications mb-4">
+                        <h4 class="section-heading">Уведомления</h4>
+                        <div class="list-group">
+                            {% for notification in candidate.notifications %}
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h5 class="mb-1">{{ notification.type|replace('_', ' ')|title }}</h5>
+                                        <small>{{ notification.created_at.strftime('%d.%m.%Y') }}</small>
+                                    </div>
+                                    <p class="mb-1">{{ notification.message }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="contact-info p-3 border rounded">
+                        <h4 class="section-heading">Есть вопросы?</h4>
+                        <p>Если у вас есть вопросы по вашей заявке, пожалуйста, свяжитесь с нами:</p>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-envelope me-2"></i>Email: <a href="mailto:hr@company.com">hr@company.com</a></li>
+                            <li><i class="fas fa-phone me-2"></i>Телефон: +7 (XXX) XXX-XX-XX</li>
+                        </ul>
+                        <p class="mb-0"><small>При обращении, пожалуйста, укажите ваш код отслеживания: <strong>{{ candidate.tracking_code }}</strong></small></p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex gap-3 justify-content-between">
+                        <a href="{{ url_for('public_bp.vacancies') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-search me-2"></i>Другие вакансии
+                        </a>
+                        <a href="{{ url_for('public_bp.track') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-search me-2"></i>Проверить другую заявку
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

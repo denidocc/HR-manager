@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4 px-lg-5">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('public_bp.index') }}">Главная</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('public_bp.vacancies') }}">Вакансии</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ vacancy.title }}</li>
+        </ol>
+    </nav>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="mb-0">{{ vacancy.title }}</h2>
+                </div>
+                <div class="card-body">
+                    <div class="vacancy-details mb-4">
+                        <p><i class="fas fa-briefcase me-2"></i><strong>Тип занятости:</strong> {{ vacancy.c_employment_type.name }}</p>
+                        <p><i class="fas fa-calendar-alt me-2"></i><strong>Опубликовано:</strong> {{ vacancy.created_at.strftime('%d.%m.%Y') }}</p>
+                    </div>
+                    
+                    <h3 class="section-heading">Описание задач</h3>
+                    <div class="vacancy-section mb-4">
+                        {{ vacancy.description_tasks | safe }}
+                    </div>
+                    
+                    <h3 class="section-heading">Условия работы</h3>
+                    <div class="vacancy-section mb-4">
+                        {{ vacancy.description_conditions | safe }}
+                    </div>
+                    
+                    <h3 class="section-heading">Идеальный кандидат</h3>
+                    <div class="vacancy-section mb-4">
+                        {{ vacancy.ideal_profile | safe }}
+                    </div>
+                    
+                    <div class="apply-button mt-4">
+                        <a href="{{ url_for('public_bp.apply', vacancy_id=vacancy.id) }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-paper-plane me-2"></i>Откликнуться на вакансию
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Полезная информация</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <i class="fas fa-info-circle me-2 text-primary"></i>
+                            <strong>Этапы отбора:</strong>
+                            <ul class="mt-2">
+                                <li>Рассмотрение резюме</li>
+                                <li>Тестовое задание</li>
+                                <li>Собеседование с HR</li>
+                                <li>Техническое интервью</li>
+                                <li>Предложение о работе</li>
+                            </ul>
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-clock me-2 text-primary"></i>
+                            <strong>Среднее время отклика:</strong> 2-3 рабочих дня
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-question-circle me-2 text-primary"></i>
+                            <strong>Есть вопросы?</strong><br>
+                            Свяжитесь с нами по электронной почте:<br>
+                            <a href="mailto:hr@company.com">hr@company.com</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Отслеживание заявки</h4>
+                </div>
+                <div class="card-body">
+                    <p>Уже отправили заявку? Проверьте статус:</p>
+                    <a href="{{ url_for('public_bp.track') }}" class="btn btn-accent">
+                        <i class="fas fa-search me-2"></i>Отслеживание заявки
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

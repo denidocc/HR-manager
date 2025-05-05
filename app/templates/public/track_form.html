@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">
+                        <i class="fas fa-search me-2"></i>Отслеживание статуса заявки
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="track-info mb-4">
+                        <p>Введите код отслеживания, который вы получили после подачи заявки, чтобы узнать текущий статус вашей заявки.</p>
+                    </div>
+                    
+                    <form method="POST" action="{{ url_for('public_bp.track_result') }}" class="track-form">
+                        <div class="mb-4">
+                            <label for="tracking_code" class="form-label">Код отслеживания</label>
+                            <input type="text" class="form-control form-control-lg" id="tracking_code" name="tracking_code" 
+                                   placeholder="Введите ваш код отслеживания" required>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-search me-2"></i>Проверить статус
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <div class="lost-code text-center">
+                        <p class="mb-0">
+                            <i class="fas fa-question-circle me-1"></i>Потеряли код отслеживания? 
+                            <a href="mailto:hr@company.com">Свяжитесь с нами</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h3 class="mb-0">Часто задаваемые вопросы</h3>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="faqAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="faqOne">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                                    Сколько времени занимает рассмотрение моей заявки?
+                                </button>
+                            </h2>
+                            <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="faqOne" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    Обычно мы рассматриваем заявки в течение 2-3 рабочих дней. Этот срок может быть увеличен в периоды высокой нагрузки.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="faqTwo">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                    Как я узнаю, что статус моей заявки изменился?
+                                </button>
+                            </h2>
+                            <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="faqTwo" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    Мы отправляем уведомление на email, указанный при подаче заявки, при любом изменении статуса. 
+                                    Кроме того, вы всегда можете проверить текущий статус с помощью кода отслеживания.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="faqThree">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                    Могу ли я отменить свою заявку?
+                                </button>
+                            </h2>
+                            <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="faqThree" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    Да, вы можете отменить заявку, связавшись с нами по электронной почте hr@company.com. 
+                                    Укажите ваш код отслеживания и причину отмены.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

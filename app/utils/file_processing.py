@@ -21,7 +21,14 @@ def save_resume(file, tracking_code):
     
     # Получаем расширение файла
     filename = secure_filename(file.filename)
-    extension = filename.rsplit('.', 1)[1].lower()
+    
+    # Проверяем наличие расширения
+    parts = filename.rsplit('.', 1) if '.' in filename else [filename, '']
+    if len(parts) < 2 or not parts[1]:
+        # Если расширение отсутствует или пустое, используем расширение по умолчанию
+        extension = 'pdf'  # Расширение по умолчанию
+    else:
+        extension = parts[1].lower()
     
     # Создаем имя файла на основе кода отслеживания
     new_filename = f"resume_{tracking_code}.{extension}"
@@ -45,7 +52,13 @@ def extract_text_from_resume(file_path):
     if not file_path or not os.path.exists(file_path):
         return None
     
-    extension = file_path.rsplit('.', 1)[1].lower()
+    # Проверяем наличие расширения
+    parts = file_path.rsplit('.', 1) if '.' in file_path else [file_path, '']
+    if len(parts) < 2 or not parts[1]:
+        # Если расширение отсутствует или пустое, используем расширение по умолчанию
+        extension = 'pdf'  # Расширение по умолчанию
+    else:
+        extension = parts[1].lower()
     
     # Извлечение текста из разных форматов файлов
     if extension == 'pdf':

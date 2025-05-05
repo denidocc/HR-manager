@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard.hr_dashboard') }}">Панель управления</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('vacancies.index') }}">Вакансии</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ vacancy.title }}</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="section-heading">{{ vacancy.title }}</h1>
+                <div>
+                    <a href="{{ url_for('vacancies.edit', id=vacancy.id) }}" class="btn btn-primary me-2">
+                        <i class="fas fa-edit me-2"></i>Редактировать
+                    </a>
+                    <button type="button" class="btn btn-outline-danger" 
+                        onclick="confirmArchive('{{ vacancy.id }}', '{{ vacancy.title }}')">
+                        <i class="fas fa-archive me-2"></i>
+                        {% if vacancy.is_active %}Архивировать{% else %}Восстановить{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Информация о вакансии</h4>
+                </div>
+                <div class="card-body">
+                    <div class="vacancy-details mb-4 row">
+                        <div class="col-md-6">
+                            <p><strong>Тип занятости:</strong> {{ employment_type.name if employment_type else 'Не указан' }}</p>
+                            <p><strong>Дата создания:</strong> {{ vacancy.created_at.strftime('%d.%m.%Y') }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Статус:</strong> 
+                                <span class="badge {% if vacancy.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ 'Активна' if vacancy.is_active else 'В архиве' }}
+                                </span>
+                            </p>
+                            <p><strong>Кандидатов:</strong> {{ candidates_count }}</p>
+                        </div>
+                    </div>
+                    
+                    <h5 class="section-heading">Описание задач</h5>
+                    <div class="vacancy-section mb-4">
+                        {{ vacancy.description_tasks | safe }}
+                    </div>
+                    
+                    <h5 class="section-heading">Условия работы</h5>
+                    <div class="vacancy-section mb-4">
+                        {{ vacancy.description_conditions | safe }}
+                    </div>
+                    
+                    <h5 class="section-heading">Идеальный кандидат</h5>
+                    <div class="vacancy-section mb-4">
+                        {{ vacancy.ideal_profile | safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Профессиональные вопросы</h4>
+                </div>
+                <div class="card-body">
+                    {% if vacancy.questions_json %}
+                        <div class="list-group list-group-flush">
+                            {% for question in vacancy.questions_json %}
+                                <div class="list-group-item">
+                                    <h6>{{ loop.index }}. {{ question.text }}</h6>
+                                    <p class="text-muted small mb-0">
+                                        <strong>Тип:</strong> 
+                                        {% if question.type == 'text' %}
+                                            Текстовый ответ
+                                        {% elif question.type == 'select' %}
+                                            Один вариант из списка
+                                        {% elif question.type == 'multiselect' %}
+                                            Несколько вариантов из списка
+                                        {% endif %}
+                                    </p>
+                                    {% if question.options %}
+                                        <p class="mt-2 mb-0"><strong>Варианты ответов:</strong></p>
+                                        <ul class="mb-0">
+                                            {% for option in question.options %}
+                                                <li>{{ option }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Нет профессиональных вопросов</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Вопросы на soft skills</h4>
+                </div>
+                <div class="card-body">
+                    {% if vacancy.soft_questions_json %}
+                        <div class="list-group list-group-flush">
+                            {% for question in vacancy.soft_questions_json %}
+                                <div class="list-group-item">
+                                    <h6>{{ loop.index }}. {{ question.text }}</h6>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Нет вопросов на soft skills</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для подтверждения архивации/восстановления -->
+<div class="modal fade" id="archiveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение действия</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите 
+                    {% if vacancy.is_active %}архивировать{% else %}восстановить{% endif %} 
+                    вакансию "<span id="vacancyTitle">{{ vacancy.title }}</span>"?
+                </p>
+                {% if vacancy.is_active %}
+                <p>Архивированные вакансии не отображаются на публичном сайте.</p>
+                {% else %}
+                <p>Восстановленные вакансии будут доступны на публичном сайте.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form id="archiveForm" method="POST" action="{{ url_for('vacancies.archive', id=vacancy.id) }}">
+                    <button type="submit" class="btn btn-danger">
+                        {% if vacancy.is_active %}Архивировать{% else %}Восстановить{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function confirmArchive(id, title) {
+        document.getElementById('vacancyTitle').textContent = title;
+        var modal = new bootstrap.Modal(document.getElementById('archiveModal'));
+        modal.show();
+    }
+</script>
+{% endblock %} 

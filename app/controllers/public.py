@@ -168,7 +168,7 @@ def apply(vacancy_id):
                 },
                 vacancy_answers={},  # Будет заполнено из формы
                 soft_answers={},     # Будет заполнено из формы
-                id_c_candidate_status=1,  # "Новый" статус (обычно = 1)
+                id_c_candidate_status=0,  # "Заявка подана" - теперь статус с ID=0
                 tracking_code=tracking_code
             )
             

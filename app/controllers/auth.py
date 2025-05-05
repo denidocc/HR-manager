@@ -29,7 +29,10 @@ def admin_required(f):
 def login():
     """Страница авторизации для HR-менеджеров"""
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard_bp.index'))
+        if current_user.role == 'admin':
+            return redirect(url_for('dashboard.index'))
+        else:
+            return redirect(url_for('dashboard.hr_dashboard'))
     
     form = LoginForm()
     if form.validate_on_submit():
@@ -43,6 +46,16 @@ def login():
         ).first()
         
         if user and user.check_password(form.password.data):
+            # Проверяем статус пользователя
+            if user.id_c_user_status != 1:  # Если не активен
+                if user.id_c_user_status == 2:
+                    flash('Ваша учетная запись ожидает подтверждения администратором', 'warning')
+                elif user.id_c_user_status == 3:
+                    flash('Ваша заявка на регистрацию была отклонена', 'danger')
+                else:
+                    flash('Ваша учетная запись неактивна', 'danger')
+                return render_template('auth/login.html', form=form, title='Вход в систему')
+            
             login_user(user, remember=form.remember_me.data)
             
             # Логирование успешного входа
@@ -56,7 +69,12 @@ def login():
             next_page = request.args.get('next')
             if next_page:
                 return redirect(next_page)
-            return redirect(url_for('dashboard.index'))
+                
+            # Перенаправляем пользователя на нужную панель управления в зависимости от роли
+            if user.role == 'admin':
+                return redirect(url_for('dashboard.index'))
+            else:
+                return redirect(url_for('dashboard.hr_dashboard'))
         
         flash('Неверный email или пароль', 'danger')
     
@@ -73,6 +91,7 @@ def register():
         # Создаем нового пользователя
         user = User()
         user.email = form.email.data
+        user.phone = form.phone.data
         user.set_password(form.password.data)
         user.role = form.role.data
         user.full_name = f"{form.first_name.data} {form.last_name.data}"
@@ -99,7 +118,10 @@ def register():
 def register_hr():
     """Публичная регистрация нового HR-менеджера"""
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard_bp.index'))
+        if current_user.role == 'admin':
+            return redirect(url_for('dashboard.index'))
+        else:
+            return redirect(url_for('dashboard.hr_dashboard'))
     
     form = PublicRegisterForm()
     
@@ -161,7 +183,10 @@ def logout():
 def reset_password_request():
     """Запрос на сброс пароля"""
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard_bp.index'))
+        if current_user.role == 'admin':
+            return redirect(url_for('dashboard.index'))
+        else:
+            return redirect(url_for('dashboard.hr_dashboard'))
     
     form = ResetPasswordRequestForm()
     if form.validate_on_submit():
@@ -194,7 +219,10 @@ def reset_password_request():
 def reset_password(token):
     """Сброс пароля по токену"""
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard_bp.index'))
+        if current_user.role == 'admin':
+            return redirect(url_for('dashboard.index'))
+        else:
+            return redirect(url_for('dashboard.hr_dashboard'))
     
     user = User.verify_reset_password_token(token)
     if not user:

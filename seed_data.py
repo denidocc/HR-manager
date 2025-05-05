@@ -84,7 +84,8 @@ def create_c_user_status():
 def create_c_candidate_status():
     """Создание справочника статусов кандидатов"""
     statuses = [
-        {'name': 'Новый', 'description': 'Кандидат только что подал заявку', 'color_code': '#3498db'},
+        {'name': 'Заявка подана', 'description': 'Кандидат только что подал заявку', 'color_code': '#3498db'},
+        {'name': 'Рассмотрение резюме', 'description': 'Резюме кандидата находится на рассмотрении', 'color_code': '#17a2b8'},
         {'name': 'Назначено интервью', 'description': 'Кандидату назначено собеседование', 'color_code': '#f39c12'},
         {'name': 'Отклонен', 'description': 'Кандидат не прошел отбор', 'color_code': '#e74c3c'},
         {'name': 'Принят', 'description': 'Кандидат принят на работу', 'color_code': '#2ecc71'},

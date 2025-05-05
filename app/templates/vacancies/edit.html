@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard.hr_dashboard') }}">Панель управления</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('vacancies.index') }}">Вакансии</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Редактирование вакансии</li>
+                </ol>
+            </nav>
+            <h1 class="section-heading">Редактирование вакансии: {{ vacancy.title }}</h1>
+            <p class="text-muted">Измените необходимые поля вакансии. Поля, отмеченные звездочкой (*), обязательны для заполнения.</p>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Информация о вакансии</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="vacancyForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    {{ form.title.label(class="form-label") }} <span class="text-danger">*</span>
+                                    {{ form.title(class="form-control" + (" is-invalid" if form.title.errors else "")) }}
+                                    {% if form.title.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.title.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    {{ form.id_c_employment_type.label(class="form-label") }} <span class="text-danger">*</span>
+                                    {{ form.id_c_employment_type(class="form-select" + (" is-invalid" if form.id_c_employment_type.errors else "")) }}
+                                    {% if form.id_c_employment_type.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.id_c_employment_type.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            {{ form.description_tasks.label(class="form-label") }} <span class="text-danger">*</span>
+                            {{ form.description_tasks(class="form-control rich-editor" + (" is-invalid" if form.description_tasks.errors else ""), rows=6) }}
+                            {% if form.description_tasks.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.description_tasks.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Опишите основные задачи и обязанности, которые будет выполнять сотрудник на данной позиции.</div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            {{ form.description_conditions.label(class="form-label") }} <span class="text-danger">*</span>
+                            {{ form.description_conditions(class="form-control rich-editor" + (" is-invalid" if form.description_conditions.errors else ""), rows=6) }}
+                            {% if form.description_conditions.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.description_conditions.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Укажите условия работы: график, расположение офиса, возможность удаленной работы и другие бонусы.</div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            {{ form.ideal_profile.label(class="form-label") }} <span class="text-danger">*</span>
+                            {{ form.ideal_profile(class="form-control rich-editor" + (" is-invalid" if form.ideal_profile.errors else ""), rows=6) }}
+                            {% if form.ideal_profile.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.ideal_profile.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Опишите идеального кандидата: необходимые навыки, опыт работы, образование и другие требования.</div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label class="form-label">Профессиональные вопросы</label>
+                            <div id="questionsBuilder" class="border rounded p-3 mb-2">
+                                <p class="mb-2">Добавьте вопросы, которые будут заданы кандидату при отклике на вакансию.</p>
+                                <div id="questionsContainer">
+                                    <!-- Здесь будут динамически добавляться вопросы -->
+                                </div>
+                                <button type="button" id="addQuestionBtn" class="btn btn-sm btn-outline-primary mt-2">
+                                    <i class="fas fa-plus me-1"></i>Добавить вопрос
+                                </button>
+                            </div>
+                            <input type="hidden" name="questions_json" id="questionsJsonField" value="{{ form.questions_json.data }}">
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label class="form-label">Вопросы на soft skills</label>
+                            <div id="softQuestionsBuilder" class="border rounded p-3 mb-2">
+                                <p class="mb-2">Добавьте вопросы для оценки личностных качеств и мягких навыков кандидата.</p>
+                                <div id="softQuestionsContainer">
+                                    <!-- Здесь будут динамически добавляться вопросы -->
+                                </div>
+                                <button type="button" id="addSoftQuestionBtn" class="btn btn-sm btn-outline-primary mt-2">
+                                    <i class="fas fa-plus me-1"></i>Добавить вопрос
+                                </button>
+                            </div>
+                            <input type="hidden" name="soft_questions_json" id="softQuestionsJsonField" value="{{ form.soft_questions_json.data }}">
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <div class="form-check form-switch">
+                                {{ form.is_active(class="form-check-input") }}
+                                {{ form.is_active.label(class="form-check-label") }}
+                            </div>
+                            <div class="form-text">Неактивные вакансии не будут отображаться на публичном сайте.</div>
+                        </div>
+                        
+                        <div class="form-group mt-4 d-flex justify-content-between">
+                            <a href="{{ url_for('vacancies.index') }}" class="btn btn-outline-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/vacancy_questions.js') }}"></script>
+{% endblock %} 

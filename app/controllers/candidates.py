@@ -11,40 +11,52 @@ from app.utils.email_service import send_status_change_notification
 import os
 from werkzeug.utils import secure_filename
 import datetime
+import json
+import logging
+from sqlalchemy import desc
+
+# Получаем логгер
+logger = logging.getLogger(__name__)
 
 candidates_bp = Blueprint('candidates', __name__, url_prefix='/candidates')
 
 @candidates_bp.route('/')
 @login_required
 def index():
-    """Список всех кандидатов"""
-    # Получаем параметры фильтрации
+    """Список всех кандидатов HR-менеджера"""
+    # Получаем параметры фильтра
     vacancy_id = request.args.get('vacancy_id', type=int)
     status_id = request.args.get('status_id', type=int)
-    sort_by = request.args.get('sort', 'date')
+    sort_by = request.args.get('sort_by', 'date')
     
     # Базовый запрос
-    query = Candidate.query
+    query = db.session.query(Candidate).join(
+        Vacancy, Candidate.vacancy_id == Vacancy.id
+    ).filter(
+        Vacancy.created_by == current_user.id
+    )
     
     # Применяем фильтры
     if vacancy_id:
-        query = query.filter_by(vacancy_id=vacancy_id)
+        query = query.filter(Candidate.vacancy_id == vacancy_id)
     
     if status_id:
-        query = query.filter_by(id_c_candidate_status=status_id)
+        query = query.filter(Candidate.id_c_candidate_status == status_id)
     
     # Сортировка
     if sort_by == 'date':
         query = query.order_by(Candidate.created_at.desc())
     elif sort_by == 'match':
         query = query.order_by(Candidate.ai_match_percent.desc())
-    elif sort_by == 'name':
-        query = query.order_by(Candidate.full_name)
+    else:
+        query = query.order_by(Candidate.created_at.desc())
     
     candidates = query.all()
     
-    # Получаем все вакансии и статусы для фильтров
-    vacancies = Vacancy.query.all()
+    # Получаем все вакансии HR-менеджера для фильтра
+    vacancies = Vacancy.query.filter_by(created_by=current_user.id).all()
+    
+    # Получаем все статусы кандидатов для фильтра
     statuses = C_Candidate_Status.query.all()
     
     return render_template(
@@ -52,43 +64,36 @@ def index():
         candidates=candidates,
         vacancies=vacancies,
         statuses=statuses,
-        current_vacancy_id=vacancy_id,
-        current_status_id=status_id,
-        current_sort=sort_by,
-        title='Управление кандидатами'
+        vacancy_id=vacancy_id,
+        status_id=status_id,
+        sort_by=sort_by,
+        title='Кандидаты'
     )
 
-@candidates_bp.route('/<int:id>/view')
+@candidates_bp.route('/<int:id>')
 @login_required
 def view(id):
-    """Просмотр детальной информации о кандидате"""
+    """Детальная информация о кандидате"""
     candidate = Candidate.query.get_or_404(id)
-    vacancy = Vacancy.query.get(candidate.vacancy_id)
     
-    # Форма для добавления комментария
-    comment_form = CandidateCommentForm()
+    # Проверяем, принадлежит ли вакансия текущему HR-менеджеру
+    if candidate.vacancy.created_by != current_user.id:
+        flash('У вас нет доступа к просмотру этого кандидата', 'danger')
+        return redirect(url_for('candidates.index'))
     
-    # Форма для изменения статуса
-    status_form = CandidateStatusForm()
-    status_form.id_c_candidate_status.choices = [
-        (s.id, s.name) for s in C_Candidate_Status.query.all()
-    ]
-    status_form.id_c_candidate_status.data = candidate.id_c_candidate_status
+    # Получаем статусы для формы изменения статуса
+    statuses = C_Candidate_Status.query.all()
     
-    # Логирование просмотра кандидата
-    SystemLog.log(
-        event_type="view_candidate",
-        description=f"Просмотр карточки кандидата ID={candidate.id}",
-        user_id=current_user.id,
-        ip_address=request.remote_addr
-    )
+    # Определяем путь к файлу резюме (если есть)
+    resume_file_url = None
+    if candidate.resume_path:
+        resume_file_url = url_for('files.download_resume', filename=os.path.basename(candidate.resume_path))
     
     return render_template(
         'candidates/view.html',
         candidate=candidate,
-        vacancy=vacancy,
-        comment_form=comment_form,
-        status_form=status_form,
+        statuses=statuses,
+        resume_file_url=resume_file_url,
         title=f'Кандидат: {candidate.full_name}'
     )
 
@@ -98,97 +103,94 @@ def change_status(id):
     """Изменение статуса кандидата"""
     candidate = Candidate.query.get_or_404(id)
     
-    form = CandidateStatusForm()
-    form.id_c_candidate_status.choices = [
-        (s.id, s.name) for s in C_Candidate_Status.query.all()
-    ]
+    # Проверяем, принадлежит ли вакансия текущему HR-менеджеру
+    if candidate.vacancy.created_by != current_user.id:
+        flash('У вас нет доступа к редактированию этого кандидата', 'danger')
+        return redirect(url_for('candidates.index'))
     
-    if form.validate_on_submit():
-        old_status = candidate.c_candidate_status.name
-        
-        # Обновляем статус
-        candidate.id_c_candidate_status = form.id_c_candidate_status.data
-        
-        # Если статус изменен на "Назначено интервью", сохраняем дату интервью
-        if candidate.c_candidate_status.name == "Назначено интервью" and form.interview_date.data:
-            candidate.interview_date = form.interview_date.data
-        
-        db.session.commit()
-        
-        new_status = candidate.c_candidate_status.name
-        
-        # Логирование
-        SystemLog.log(
-            event_type="candidate_status_change",
-            description=f"Изменен статус кандидата ID={candidate.id} с '{old_status}' на '{new_status}'",
-            user_id=current_user.id,
-            ip_address=request.remote_addr
-        )
-        
-        # Создание уведомления для кандидата
-        notification_type = "status_update"
-        message = f"Статус вашей заявки на вакансию '{candidate.vacancy.title}' изменен на '{new_status}'."
-        
-        if new_status == "Назначено интервью":
-            notification_type = "interview_invitation"
-            interview_date_str = candidate.interview_date.strftime("%d.%m.%Y %H:%M") if candidate.interview_date else "будет согласована дополнительно"
-            message = f"Приглашаем вас на собеседование по вакансии '{candidate.vacancy.title}'. Дата: {interview_date_str}."
-        elif new_status == "Отклонен":
-            notification_type = "rejection"
-            message = f"К сожалению, ваша кандидатура на вакансию '{candidate.vacancy.title}' была отклонена. Благодарим за интерес к нашей компании."
-        elif new_status == "Принят":
-            notification_type = "offer"
-            message = f"Поздравляем! Вам сделано предложение о работе на позицию '{candidate.vacancy.title}'. Ожидаем вашего ответа."
-        
-        # Создаем уведомление
-        notification = Notification(
-            candidate_id=candidate.id,
-            type=notification_type,
-            message=message
-        )
-        db.session.add(notification)
-        db.session.commit()
-        
-        # Отправляем уведомление по email
-        send_status_change_notification(candidate, notification)
-        
-        flash(f'Статус кандидата обновлен на "{new_status}"', 'success')
-        return redirect(url_for('candidates.view', id=candidate.id))
+    # Получаем новый статус из формы
+    new_status_id = request.form.get('status_id', type=int)
+    interview_date_str = request.form.get('interview_date')
     
-    flash('Произошла ошибка при обновлении статуса', 'danger')
-    return redirect(url_for('candidates.view', id=candidate.id))
+    if not new_status_id:
+        flash('Не указан новый статус', 'danger')
+        return redirect(url_for('candidates.view', id=id))
+    
+    # Получаем статус из БД для проверки
+    status = C_Candidate_Status.query.get(new_status_id)
+    if not status:
+        flash('Указан некорректный статус', 'danger')
+        return redirect(url_for('candidates.view', id=id))
+    
+    # Обновляем статус
+    old_status_id = candidate.id_c_candidate_status
+    candidate.id_c_candidate_status = new_status_id
+    
+    # Если новый статус "Собеседование", то обновляем дату собеседования
+    if new_status_id == 2 and interview_date_str:  # ID статуса "Назначено интервью" = 2
+        try:
+            interview_date = datetime.strptime(interview_date_str, '%Y-%m-%dT%H:%M')
+            candidate.interview_date = interview_date
+        except ValueError:
+            flash('Некорректный формат даты собеседования', 'warning')
+    
+    db.session.commit()
+    
+    # Логируем изменение статуса
+    SystemLog.log(
+        event_type="candidate_status_change",
+        description=f"Изменен статус кандидата ID={id} с '{old_status_id}' на '{new_status_id}'",
+        user_id=current_user.id,
+        ip_address=request.remote_addr
+    )
+    
+    flash(f'Статус кандидата успешно изменен на "{status.name}"', 'success')
+    return redirect(url_for('candidates.view', id=id))
 
 @candidates_bp.route('/<int:id>/add_comment', methods=['POST'])
 @login_required
 def add_comment(id):
     """Добавление комментария к кандидату"""
     candidate = Candidate.query.get_or_404(id)
-    form = CandidateCommentForm()
     
-    if form.validate_on_submit():
+    # Проверяем, принадлежит ли вакансия текущему HR-менеджеру
+    if candidate.vacancy.created_by != current_user.id:
+        flash('У вас нет доступа к редактированию этого кандидата', 'danger')
+        return redirect(url_for('candidates.index'))
+    
+    # Получаем комментарий из формы
+    comment = request.form.get('comment', '').strip()
+    
+    if comment:
         # Обновляем комментарий
-        candidate.hr_comment = form.comment.data
+        candidate.hr_comment = comment
         db.session.commit()
         
-        # Логирование
+        # Логируем добавление комментария
         SystemLog.log(
-            event_type="candidate_comment_added",
-            description=f"Добавлен комментарий к кандидату ID={candidate.id}",
+            event_type="candidate_comment_add",
+            description=f"Добавлен комментарий к кандидату ID={id}",
             user_id=current_user.id,
             ip_address=request.remote_addr
         )
         
-        flash('Комментарий добавлен', 'success')
+        flash('Комментарий успешно добавлен', 'success')
     else:
-        flash('Произошла ошибка при добавлении комментария', 'danger')
+        flash('Комментарий не может быть пустым', 'warning')
     
-    return redirect(url_for('candidates.view', id=candidate.id))
+    return redirect(url_for('candidates.view', id=id))
 
 @candidates_bp.route('/<int:id>/download_resume')
 @login_required
 def download_resume(id):
     """Скачивание резюме кандидата"""
     candidate = Candidate.query.get_or_404(id)
+    vacancy = Vacancy.query.get(candidate.vacancy_id)
+    
+    # Проверка доступа для HR-менеджера
+    if current_user.role == 'hr' and vacancy.created_by != current_user.id:
+        flash('У вас нет прав для скачивания резюме этого кандидата', 'danger')
+        return redirect(url_for('candidates.index'))
     
     if not candidate.resume_path:
         flash('Резюме не найдено', 'danger')
@@ -218,6 +220,12 @@ def download_resume(id):
 def start_analysis(id):
     """Запуск AI-анализа кандидата"""
     candidate = Candidate.query.get_or_404(id)
+    vacancy = Vacancy.query.get(candidate.vacancy_id)
+    
+    # Проверка доступа для HR-менеджера
+    if current_user.role == 'hr' and vacancy.created_by != current_user.id:
+        flash('У вас нет прав для запуска анализа этого кандидата', 'danger')
+        return redirect(url_for('candidates.index'))
     
     # Проверяем, есть ли текст резюме
     if not candidate.resume_text:
@@ -257,4 +265,39 @@ def track(tracking_code):
         candidate=candidate,
         vacancy=candidate.vacancy,
         title='Отслеживание статуса заявки'
-    ) 
+    )
+
+@candidates_bp.route('/api/candidates')
+@login_required
+def api_candidates():
+    """API для получения списка кандидатов (для AJAX-запросов)"""
+    vacancy_id = request.args.get('vacancy_id', type=int)
+    status_id = request.args.get('status_id', type=int)
+    
+    query = db.session.query(Candidate).join(
+        Vacancy, Candidate.vacancy_id == Vacancy.id
+    ).filter(
+        Vacancy.created_by == current_user.id
+    )
+    
+    if vacancy_id:
+        query = query.filter(Candidate.vacancy_id == vacancy_id)
+    
+    if status_id:
+        query = query.filter(Candidate.id_c_candidate_status == status_id)
+    
+    candidates = query.all()
+    
+    # Преобразуем данные в JSON
+    result = []
+    for candidate in candidates:
+        result.append({
+            'id': candidate.id,
+            'full_name': candidate.full_name,
+            'vacancy': candidate.vacancy.title,
+            'status': candidate.c_candidate_status.name if candidate.c_candidate_status else 'Заявка подана',
+            'created_at': candidate.created_at.strftime('%d.%m.%Y'),
+            'ai_match_percent': candidate.ai_match_percent or 0
+        })
+    
+    return jsonify(result) 

@@ -59,7 +59,7 @@ class Candidate(db.Model):
             'email': self.email,
             'phone': self.phone,
             'ai_match_percent': self.ai_match_percent,
-            'status': self.c_candidate_status.name if self.c_candidate_status else 'Новый',
+            'status': self.c_candidate_status.name if self.c_candidate_status else 'Заявка подана',
             'interview_date': self.interview_date.isoformat() if self.interview_date else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'tracking_code': self.tracking_code

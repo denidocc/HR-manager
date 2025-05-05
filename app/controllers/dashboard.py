@@ -282,14 +282,14 @@ def approve_user(user_id):
     # Проверяем, что пользователь в статусе "Ожидает подтверждения"
     if user.id_c_user_status != 2:  # Статус "Ожидает подтверждения"
         flash('Пользователь не нуждается в подтверждении или уже подтвержден', 'warning')
-        return redirect(url_for('dashboard_bp.users'))
+        return redirect(url_for('dashboard.users'))
     
     # Меняем статус на "Активен"
     user.id_c_user_status = 1  # Статус "Активен"
     
     # Логирование действия
     log = SystemLog(
-        action='approve_user',
+        event_type='approve_user',
         description=f'Подтверждение регистрации пользователя {user.full_name}',
         ip_address=request.remote_addr,
         user_id=current_user.id
@@ -299,7 +299,7 @@ def approve_user(user_id):
     db.session.commit()
     
     flash('Пользователь успешно подтвержден', 'success')
-    return redirect(url_for('dashboard_bp.users'))
+    return redirect(url_for('dashboard.users'))
 
 @dashboard_bp.route('/reject-user/<int:user_id>', methods=['POST'])
 @login_required
@@ -311,14 +311,14 @@ def reject_user(user_id):
     # Проверяем, что пользователь в статусе "Ожидает подтверждения"
     if user.id_c_user_status != 2:  # Статус "Ожидает подтверждения"
         flash('Пользователь не нуждается в подтверждении или уже обработан', 'warning')
-        return redirect(url_for('dashboard_bp.users'))
+        return redirect(url_for('dashboard.users'))
     
     # Меняем статус на "Отклонен"
     user.id_c_user_status = 3  # Статус "Отклонен"
     
     # Логирование действия
     log = SystemLog(
-        action='reject_user',
+        event_type='reject_user',
         description=f'Отклонение регистрации пользователя {user.full_name}',
         ip_address=request.remote_addr,
         user_id=current_user.id
@@ -328,4 +328,45 @@ def reject_user(user_id):
     db.session.commit()
     
     flash('Регистрация пользователя отклонена', 'success')
-    return redirect(url_for('dashboard_bp.users')) 
+    return redirect(url_for('dashboard.users'))
+
+@dashboard_bp.route('/hr')
+@login_required
+def hr_dashboard():
+    """Главная страница дашборда для HR-менеджеров"""
+    # Статистика по системе (упрощенная для HR)
+    
+    # Получаем только вакансии текущего HR-менеджера
+    my_vacancies = Vacancy.query.filter_by(created_by=current_user.id).all()
+    my_vacancy_ids = [vacancy.id for vacancy in my_vacancies]
+    
+    # Общее количество вакансий HR-менеджера
+    total_my_vacancies_count = len(my_vacancies)
+    
+    # Статистика активных вакансий HR-менеджера
+    active_vacancies_count = Vacancy.query.filter_by(is_active=True, created_by=current_user.id).count()
+    
+    # Общее количество кандидатов на вакансии HR-менеджера
+    total_candidates_count = Candidate.query.filter(Candidate.vacancy_id.in_(my_vacancy_ids)).count() if my_vacancy_ids else 0
+    
+    # Последние кандидаты только на вакансии текущего HR-менеджера
+    recent_candidates = Candidate.query.filter(Candidate.vacancy_id.in_(my_vacancy_ids)).order_by(Candidate.created_at.desc()).limit(5).all() if my_vacancy_ids else []
+    
+    # Вакансии HR-менеджера с наибольшим количеством кандидатов
+    top_vacancies = db.session.query(
+        Vacancy.id, Vacancy.title, func.count(Candidate.id).label('candidates_count')
+    ).join(Candidate, Vacancy.id == Candidate.vacancy_id)\
+     .filter(Vacancy.created_by == current_user.id)\
+     .group_by(Vacancy.id)\
+     .order_by(desc('candidates_count'))\
+     .limit(5).all()
+    
+    return render_template(
+        'dashboard/hr_dashboard.html',
+        active_vacancies_count=active_vacancies_count,
+        total_candidates_count=total_candidates_count,
+        recent_candidates=recent_candidates,
+        top_vacancies=top_vacancies,
+        total_my_vacancies_count=total_my_vacancies_count,
+        title='HR Панель управления'
+    ) 

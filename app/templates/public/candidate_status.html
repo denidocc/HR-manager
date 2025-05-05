@@ -28,37 +28,37 @@
                         <h4 class="section-heading">Этапы рассмотрения</h4>
                         
                         <ul class="timeline">
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 1 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 0 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Заявка подана</h5>
                                     <p>Ваша заявка получена и зарегистрирована в системе</p>
-                                    {% if candidate.id_c_candidate_status >= 1 %}
+                                    {% if candidate.id_c_candidate_status >= 0 %}
                                         <small class="text-muted">{{ candidate.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                                    {% endif %}
+                                </div>
+                            </li>
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 1 else '' }}">
+                                <span class="timeline-point"></span>
+                                <div class="timeline-content">
+                                    <h5>Рассмотрение резюме</h5>
+                                    <p>HR-менеджер изучает вашу заявку и резюме</p>
+                                    {% if candidate.id_c_candidate_status >= 1 %}
+                                        <small class="text-muted">В процессе</small>
                                     {% endif %}
                                 </div>
                             </li>
                             <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 2 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
-                                    <h5>Рассмотрение резюме</h5>
-                                    <p>HR-менеджер изучает вашу заявку и резюме</p>
-                                    {% if candidate.id_c_candidate_status >= 2 %}
-                                        <small class="text-muted">В процессе</small>
-                                    {% endif %}
-                                </div>
-                            </li>
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 3 else '' }}">
-                                <span class="timeline-point"></span>
-                                <div class="timeline-content">
                                     <h5>Интервью</h5>
                                     <p>Приглашение на интервью с HR и техническими специалистами</p>
-                                    {% if candidate.id_c_candidate_status >= 3 and candidate.interview_date %}
+                                    {% if candidate.id_c_candidate_status >= 2 and candidate.interview_date %}
                                         <small class="text-muted">Запланировано на: {{ candidate.interview_date.strftime('%d.%m.%Y %H:%M') }}</small>
                                     {% endif %}
                                 </div>
                             </li>
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 4 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 3 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Решение</h5>

@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% if current_user.role == 'admin' %}{{ url_for('dashboard.index') }}{% else %}{{ url_for('dashboard.hr_dashboard') }}{% endif %}">Панель управления</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('candidates.index') }}">Кандидаты</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ candidate.full_name }}</li>
+                </ol>
+            </nav>
+            <h1 class="section-heading">Кандидат: {{ candidate.full_name }}</h1>
+            <p class="text-muted">Вакансия: <a href="{{ url_for('vacancies.view', id=candidate.vacancy_id) }}">{{ candidate.vacancy.title }}</a> | Дата отклика: {{ candidate.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <!-- Левая колонка: основная информация -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h4 class="mb-0">Основная информация</h4>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">ФИО:</dt>
+                        <dd class="col-sm-8">{{ candidate.full_name }}</dd>
+                        
+                        <dt class="col-sm-4">Email:</dt>
+                        <dd class="col-sm-8">{{ candidate.email }}</dd>
+                        
+                        <dt class="col-sm-4">Телефон:</dt>
+                        <dd class="col-sm-8">{{ candidate.phone }}</dd>
+                        
+                        <dt class="col-sm-4">Статус:</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge rounded-pill" 
+                                  style="background-color: {{ candidate.c_candidate_status.color_code if candidate.c_candidate_status else '#6c757d' }}">
+                                {{ candidate.c_candidate_status.name if candidate.c_candidate_status else 'Заявка подана' }}
+                            </span>
+                        </dd>
+                        
+                        {% if candidate.interview_date %}
+                        <dt class="col-sm-4">Дата интервью:</dt>
+                        <dd class="col-sm-8">{{ candidate.interview_date.strftime('%d.%m.%Y %H:%M') }}</dd>
+                        {% endif %}
+                        
+                        <dt class="col-sm-4">Трекинг-код:</dt>
+                        <dd class="col-sm-8">{{ candidate.tracking_code }}</dd>
+                    </dl>
+                    
+                    <!-- Форма изменения статуса -->
+                    <div class="mt-4">
+                        <h5>Изменить статус</h5>
+                        <form method="POST" action="{{ url_for('candidates.change_status', id=candidate.id) }}" class="row g-3">
+                            <div class="col-md-6">
+                                <select name="status_id" class="form-select" required>
+                                    {% for status in statuses %}
+                                    <option value="{{ status.id }}" {% if candidate.id_c_candidate_status == status.id %}selected{% endif %}>{{ status.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6" id="interviewDateContainer" style="display: none;">
+                                <input type="datetime-local" name="interview_date" class="form-control" 
+                                       {% if candidate.interview_date %}
+                                       value="{{ candidate.interview_date.strftime('%Y-%m-%dT%H:%M') }}"
+                                       {% endif %}>
+                            </div>
+                            
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Обновить статус</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Форма добавления комментария -->
+                    <div class="mt-4">
+                        <h5>Комментарий HR</h5>
+                        <form method="POST" action="{{ url_for('candidates.add_comment', id=candidate.id) }}">
+                            <div class="mb-3">
+                                <textarea name="comment" class="form-control" rows="3" placeholder="Добавьте ваш комментарий">{{ candidate.hr_comment }}</textarea>
+                            </div>
+                            <button type="submit" class="btn btn-outline-primary">Сохранить комментарий</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Правая колонка: AI-анализ -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h4 class="mb-0">AI-анализ соответствия</h4>
+                </div>
+                <div class="card-body">
+                    {% if candidate.ai_match_percent %}
+                    <div class="text-center mb-4">
+                        <h2>Общая оценка соответствия</h2>
+                        <div class="progress mt-3 mb-3" style="height: 30px;">
+                            <div class="progress-bar 
+                                {% if candidate.ai_match_percent >= 80 %}bg-success
+                                {% elif candidate.ai_match_percent >= 60 %}bg-primary
+                                {% elif candidate.ai_match_percent >= 40 %}bg-info
+                                {% elif candidate.ai_match_percent >= 20 %}bg-warning
+                                {% else %}bg-danger{% endif %}" 
+                                role="progressbar" 
+                                style="width: {{ candidate.ai_match_percent }}%;" 
+                                aria-valuenow="{{ candidate.ai_match_percent }}" 
+                                aria-valuemin="0" 
+                                aria-valuemax="100">
+                                <strong>{{ candidate.ai_match_percent }}%</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">Сильные стороны</h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if candidate.ai_pros %}
+                                    <ul class="mb-0">
+                                        {% for pro in candidate.ai_pros.split('\n') %}
+                                        <li>{{ pro }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}
+                                    <p class="text-muted mb-0">Нет данных</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-danger">
+                                <div class="card-header bg-danger text-white">
+                                    <h5 class="mb-0">Слабые стороны</h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if candidate.ai_cons %}
+                                    <ul class="mb-0">
+                                        {% for con in candidate.ai_cons.split('\n') %}
+                                        <li>{{ con }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}
+                                    <p class="text-muted mb-0">Нет данных</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>Рекомендация AI:</h5>
+                        <div class="p-3 border rounded">
+                            {{ candidate.ai_recommendation or 'Нет рекомендаций' }}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>Детализация по категориям:</h5>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Категория</th>
+                                    <th>Оценка</th>
+                                    <th>Комментарий</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Локация</td>
+                                    <td>{{ candidate.ai_score_location or 'N/A' }}/10</td>
+                                    <td>{{ candidate.ai_score_comments_location or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Опыт работы</td>
+                                    <td>{{ candidate.ai_score_experience or 'N/A' }}/10</td>
+                                    <td>{{ candidate.ai_score_comments_experience or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Технические навыки</td>
+                                    <td>{{ candidate.ai_score_tech or 'N/A' }}/10</td>
+                                    <td>{{ candidate.ai_score_comments_tech or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Образование</td>
+                                    <td>{{ candidate.ai_score_education or 'N/A' }}/10</td>
+                                    <td>{{ candidate.ai_score_comments_education or '' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if candidate.ai_mismatch_notes %}
+                    <div class="mb-0">
+                        <h5>Примечания о несоответствии:</h5>
+                        <div class="p-3 border rounded">
+                            {{ candidate.ai_mismatch_notes }}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="text-center">
+                        <div class="alert alert-info">
+                            <i class="fas fa-robot me-2"></i>AI-анализ еще не проведен для этого кандидата
+                        </div>
+                        <button class="btn btn-primary" onclick="runAIAnalysis({{ candidate.id }})">
+                            <i class="fas fa-brain me-2"></i>Запустить AI-анализ
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <!-- Ответы на вопросы анкеты -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Ответы на вопросы</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Базовые ответы -->
+                    <h5>Базовая информация</h5>
+                    <table class="table table-striped">
+                        <tbody>
+                            {% if candidate.base_answers %}
+                            {% for question, answer in candidate.base_answers.items() %}
+                            <tr>
+                                <td><strong>{{ question }}</strong></td>
+                                <td>{{ answer }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="2">Нет данных</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                    
+                    <!-- Профессиональные вопросы -->
+                    <h5 class="mt-4">Профессиональные вопросы</h5>
+                    <table class="table table-striped">
+                        <tbody>
+                            {% if candidate.vacancy_answers %}
+                            {% for question, answer in candidate.vacancy_answers.items() %}
+                            <tr>
+                                <td><strong>{{ question }}</strong></td>
+                                <td>{{ answer }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="2">Нет данных</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                    
+                    <!-- Soft skills вопросы -->
+                    <h5 class="mt-4">Вопросы на soft skills</h5>
+                    <table class="table table-striped">
+                        <tbody>
+                            {% if candidate.soft_answers %}
+                            {% for question, answer in candidate.soft_answers.items() %}
+                            <tr>
+                                <td><strong>{{ question }}</strong></td>
+                                <td>{{ answer }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="2">Нет данных</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Резюме кандидата -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Резюме кандидата</h4>
+                    {% if resume_file_url %}
+                    <a href="{{ resume_file_url }}" class="btn btn-sm btn-outline-primary" download>
+                        <i class="fas fa-download me-1"></i>Скачать оригинал
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if candidate.resume_text %}
+                    <div class="resume-text p-3 border rounded" style="max-height: 500px; overflow-y: auto;">
+                        {{ candidate.resume_text | replace('\n', '<br>') | safe }}
+                    </div>
+                    {% elif resume_file_url %}
+                    <div class="text-center p-4">
+                        <p class="mb-3">Текст резюме не извлечен, но вы можете скачать оригинальный файл</p>
+                        <a href="{{ resume_file_url }}" class="btn btn-primary" download>
+                            <i class="fas fa-download me-2"></i>Скачать резюме
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>Кандидат не приложил резюме
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Показ/скрытие поля для даты собеседования в зависимости от выбранного статуса
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusSelect = document.querySelector('select[name="status_id"]');
+        const interviewDateContainer = document.getElementById('interviewDateContainer');
+        
+        // Проверяем начальное состояние
+        checkInterviewStatus();
+        
+        // Добавляем обработчик события
+        statusSelect.addEventListener('change', checkInterviewStatus);
+        
+        function checkInterviewStatus() {
+            // ID статуса "Назначено интервью" = 2
+            if (statusSelect.value == '2') {
+                interviewDateContainer.style.display = 'block';
+            } else {
+                interviewDateContainer.style.display = 'none';
+            }
+        }
+    });
+    
+    // Функция для запуска AI-анализа
+    function runAIAnalysis(candidateId) {
+        // Здесь будет код для AJAX-запроса на запуск анализа
+        alert('Функциональность запуска AI-анализа будет реализована позже');
+    }
+</script>
+{% endblock %} 

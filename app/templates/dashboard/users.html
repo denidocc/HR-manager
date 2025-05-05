@@ -83,22 +83,22 @@
                                         {% endif %}
                                     </td>
                                     <td>{{ user.created_at }}</td>
-                                    <td>
+                                    <td class="actions-cell">
                                         {% if user.id_c_user_status == 2 %}
-                                        <div class="btn-group">
-                                            <form method="post" action="{{ url_for('dashboard_bp.approve_user', user_id=user.id) }}" class="d-inline">
-                                                <button type="submit" class="btn btn-sm btn-success me-1" title="Подтвердить">
+                                        <div class="d-flex justify-content-around">
+                                            <form method="post" action="{{ url_for('dashboard.approve_user', user_id=user.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-success btn-table-action" title="Подтвердить">
                                                     <i class="fas fa-check"></i>
                                                 </button>
                                             </form>
-                                            <form method="post" action="{{ url_for('dashboard_bp.reject_user', user_id=user.id) }}" class="d-inline">
-                                                <button type="submit" class="btn btn-sm btn-danger" title="Отклонить">
+                                            <form method="post" action="{{ url_for('dashboard.reject_user', user_id=user.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-danger btn-table-action" title="Отклонить">
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             </form>
                                         </div>
                                         {% else %}
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Нет действий</button>
+                                        <span class="text-muted">Нет действий</span>
                                         {% endif %}
                                     </td>
                                 </tr>

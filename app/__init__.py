@@ -8,6 +8,7 @@ from flask_login import LoginManager
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
 from flask_argon2 import Argon2
+from flask_wtf.csrf import CSRFProtect
 from config import config
 
 # Инициализация расширений
@@ -17,6 +18,7 @@ login_manager = LoginManager()
 jwt = JWTManager()
 mail = Mail()
 argon2 = Argon2()
+csrf = CSRFProtect()
 
 def create_app(config_name='default'):
     app = Flask(__name__)
@@ -29,6 +31,7 @@ def create_app(config_name='default'):
     jwt.init_app(app)
     mail.init_app(app)
     argon2.init_app(app)
+    csrf.init_app(app)
     
     # Настройка логирования
     if not app.debug:

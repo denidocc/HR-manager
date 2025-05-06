@@ -21,7 +21,7 @@ class Notification(db.Model):
     
     @staticmethod
     def get_notification_types():
-        return ['application_received', 'status_update', 'interview_invitation', 'rejection', 'offer']
+        return ['application_received', 'status_update', 'interview_invitation', 'rejection', 'offer', 'ai_analysis_completed']
     
     def to_dict(self):
         return {

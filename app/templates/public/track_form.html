@@ -16,6 +16,7 @@
                     </div>
                     
                     <form method="POST" action="{{ url_for('public_bp.track_result') }}" class="track-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-4">
                             <label for="tracking_code" class="form-label">Код отслеживания</label>
                             <input type="text" class="form-control form-control-lg" id="tracking_code" name="tracking_code" 

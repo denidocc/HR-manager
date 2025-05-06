@@ -615,7 +615,7 @@ def skills_analysis():
     except Exception as e:
         current_app.logger.error(f"Ошибка при анализе навыков: {str(e)}")
         flash(f"Ошибка при анализе навыков: {str(e)}", "danger")
-        return redirect(url_for('dashboard_bp.statistics'))
+        return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/source_analysis')
 @login_required
@@ -677,7 +677,7 @@ def source_analysis():
     except Exception as e:
         current_app.logger.error(f"Ошибка при анализе источников кандидатов: {str(e)}")
         flash(f"Ошибка при анализе источников кандидатов: {str(e)}", "danger")
-        return redirect(url_for('dashboard_bp.statistics'))
+        return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/qualification_analysis')
 @login_required
@@ -917,7 +917,7 @@ def qualification_analysis():
     except Exception as e:
         current_app.logger.error(f"Ошибка при анализе квалификации кандидатов: {str(e)}")
         flash(f"Ошибка при анализе квалификации кандидатов: {str(e)}", "danger")
-        return redirect(url_for('dashboard_bp.statistics'))
+        return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/rejection_analysis')
 @login_required
@@ -985,7 +985,7 @@ def rejection_analysis():
     except Exception as e:
         current_app.logger.error(f"Ошибка при анализе отказов: {str(e)}")
         flash(f"Ошибка при анализе отказов: {str(e)}", "danger")
-        return redirect(url_for('dashboard_bp.statistics'))
+        return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/predictive_analytics')
 @login_required
@@ -1071,7 +1071,7 @@ def predictive_analytics():
     except Exception as e:
         current_app.logger.error(f"Ошибка при формировании прогнозной аналитики: {str(e)}")
         flash(f"Ошибка при формировании прогнозной аналитики: {str(e)}", "danger")
-        return redirect(url_for('dashboard_bp.statistics'))
+        return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/seasonal_trends')
 @login_required
@@ -1144,4 +1144,4 @@ def seasonal_trends():
     except Exception as e:
         current_app.logger.error(f"Ошибка при анализе сезонных трендов: {str(e)}")
         flash(f"Ошибка при анализе сезонных трендов: {str(e)}", "danger")
-        return redirect(url_for('dashboard_bp.statistics')) 
+        return redirect(url_for('dashboard.statistics')) 

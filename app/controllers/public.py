@@ -155,23 +155,6 @@ def apply(vacancy_id):
             # Сохраняем базовую информацию
             tracking_code = str(uuid.uuid4())
             
-            candidate = Candidate(
-                vacancy_id=vacancy.id,
-                full_name=form.full_name.data,
-                email=form.email.data,
-                phone=form.phone.data,
-                base_answers={
-                    "location": form.location.data,
-                    "experience_years": form.experience_years.data,
-                    "education": form.education.data,
-                    "desired_salary": form.desired_salary.data if form.desired_salary.data else None
-                },
-                vacancy_answers={},  # Будет заполнено из формы
-                soft_answers={},     # Будет заполнено из формы
-                id_c_candidate_status=0,  # "Заявка подана" - теперь статус с ID=0
-                tracking_code=tracking_code
-            )
-            
             # Обрабатываем ответы на профессиональные вопросы
             vacancy_answers = {}
             if vacancy.questions_json:
@@ -183,8 +166,6 @@ def apply(vacancy_id):
                         vacancy_answers[question_id] = getattr(form, field_name).data
                     elif field_name in request.form and request.form.get(field_name).strip():
                         vacancy_answers[question_id] = request.form.get(field_name).strip()
-            
-            candidate.vacancy_answers = vacancy_answers
             
             # Обрабатываем ответы на soft-skill вопросы
             soft_answers = {}
@@ -198,15 +179,13 @@ def apply(vacancy_id):
                     elif field_name in request.form and request.form.get(field_name).strip():
                         soft_answers[question_id] = request.form.get(field_name).strip()
             
-            candidate.soft_answers = soft_answers
-            
             # Обрабатываем загрузку резюме
             if form.resume.data:
                 resume_file = form.resume.data
                 filename = save_resume(resume_file, tracking_code)
                 
                 if filename:
-                    candidate.resume_path = filename
+                    resume_path = filename
                     
                     # Получаем расширение файла
                     file_extension = os.path.splitext(filename)[1].lower()
@@ -216,10 +195,29 @@ def apply(vacancy_id):
                         # Извлекаем текст из резюме для других форматов
                         resume_text = extract_text_from_resume(filename)
                         if resume_text:
-                            candidate.resume_text = resume_text
+                            resume_text = resume_text
                     else:
                         # Для изображений просто сохраняем информативное сообщение
-                        candidate.resume_text = "Файл резюме загружен в формате изображения и доступен для просмотра."
+                        resume_text = "Файл резюме загружен в формате изображения и доступен для просмотра."
+            
+            # Создаем кандидата
+            candidate = Candidate(
+                vacancy_id=vacancy.id,
+                full_name=form.full_name.data,
+                email=form.email.data,
+                phone=form.phone.data,
+                base_answers={
+                    "location": form.location.data,
+                    "experience_years": form.experience_years.data,
+                    "education": form.education.data,
+                    "desired_salary": form.desired_salary.data if form.desired_salary.data else None
+                },
+                vacancy_answers=vacancy_answers,
+                soft_answers=soft_answers,
+                cover_letter=form.cover_letter.data,
+                resume_path=resume_path,
+                id_c_candidate_status=1  # Статус "Новая заявка"
+            )
             
             # Сохраняем кандидата
             db.session.add(candidate)
@@ -272,7 +270,8 @@ def apply(vacancy_id):
 @public_bp.route('/application_success/<tracking_code>')
 def application_success(tracking_code):
     """Страница успешной подачи заявки"""
-    candidate = Candidate.query.filter_by(tracking_code=tracking_code).first_or_404()
+    # Пробуем найти кандидата, но не выдаем ошибку, если не найден
+    candidate = Candidate.query.filter_by(tracking_code=tracking_code).first()
     
     return render_template(
         'public/application_success.html',

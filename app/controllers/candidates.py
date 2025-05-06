@@ -132,6 +132,7 @@ def view(id):
         Candidate.soft_answers,
         Candidate.resume_path,
         Candidate.resume_text,
+        Candidate.cover_letter,
         Candidate.ai_match_percent,
         Candidate.ai_pros,
         Candidate.ai_cons,
@@ -173,6 +174,28 @@ def view(id):
     vacancy = Vacancy.query.get(candidate_data.vacancy_id)
     status = C_Candidate_Status.query.get(candidate_data.id_c_candidate_status)
     
+    # Обрабатываем вопросы и ответы чтобы отобразить корректные данные
+    formatted_vacancy_answers = {}
+    if candidate_data.vacancy_answers and vacancy.questions_json:
+        # Создаем словарь с id -> текст вопроса
+        question_texts = {str(q['id']): q['text'] for q in vacancy.questions_json}
+        
+        # Для каждого ответа получаем текст вопроса и создаем пару "текст вопроса": ответ
+        for question_id, answer in candidate_data.vacancy_answers.items():
+            question_text = question_texts.get(question_id, f"Вопрос {question_id}")
+            formatted_vacancy_answers[question_text] = answer
+    
+    # Аналогично форматируем soft-skills вопросы
+    formatted_soft_answers = {}
+    if candidate_data.soft_answers and vacancy.soft_questions_json:
+        # Создаем словарь с id -> текст вопроса
+        soft_question_texts = {str(q['id']): q['text'] for q in vacancy.soft_questions_json}
+        
+        # Для каждого ответа получаем текст вопроса
+        for question_id, answer in candidate_data.soft_answers.items():
+            question_text = soft_question_texts.get(question_id, f"Вопрос {question_id}")
+            formatted_soft_answers[question_text] = answer
+    
     # Создаем объект с данными для шаблона
     candidate_view = {
         'id': candidate_data.id,
@@ -180,16 +203,19 @@ def view(id):
         'vacancy': {
             'id': candidate_data.vacancy_id,
             'title': candidate_data.vacancy_title,
-            'created_by': vacancy.created_by
+            'created_by': vacancy.created_by,
+            'questions_json': vacancy.questions_json,
+            'soft_questions_json': vacancy.soft_questions_json
         },
         'full_name': candidate_data.full_name,
         'email': candidate_data.email,
         'phone': candidate_data.phone,
         'base_answers': candidate_data.base_answers,
-        'vacancy_answers': candidate_data.vacancy_answers,
-        'soft_answers': candidate_data.soft_answers,
+        'vacancy_answers': formatted_vacancy_answers,  # Используем форматированные ответы
+        'soft_answers': formatted_soft_answers,  # Используем форматированные ответы
         'resume_path': candidate_data.resume_path,
         'resume_text': candidate_data.resume_text,
+        'cover_letter': candidate_data.cover_letter,
         'ai_match_percent': candidate_data.ai_match_percent,
         'ai_pros': candidate_data.ai_pros,
         'ai_cons': candidate_data.ai_cons,
@@ -290,7 +316,7 @@ def change_status(id):
     # Создаем новое уведомление
     notification = Notification(
         candidate_id=candidate.id,
-        notification_type=notification_type,
+        type=notification_type,
         message=message,
         created_at=datetime.datetime.now()
     )
@@ -388,6 +414,10 @@ def start_analysis(id):
         Candidate.vacancy_id,
         Candidate.full_name,
         Candidate.resume_text,
+        Candidate.base_answers,
+        Candidate.vacancy_answers,
+        Candidate.soft_answers,
+        Candidate.cover_letter,
         func.pgp_sym_decrypt(
             cast(Candidate._email, sa.LargeBinary),
             current_app.config['ENCRYPTION_KEY'],
@@ -406,11 +436,15 @@ def start_analysis(id):
     
     # Проверка доступа для HR-менеджера
     if current_user.role == 'hr' and vacancy.created_by != current_user.id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'У вас нет прав для запуска анализа этого кандидата'}), 403
         flash('У вас нет прав для запуска анализа этого кандидата', 'danger')
         return redirect(url_for('candidates.index'))
     
     # Проверяем, есть ли текст резюме
     if not candidate.resume_text:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Нет текста резюме для анализа. Загрузите резюме и попробуйте снова.'}), 400
         flash('Нет текста резюме для анализа. Загрузите резюме и попробуйте снова.', 'warning')
         return redirect(url_for('candidates.view', id=candidate.id))
     
@@ -427,37 +461,65 @@ def start_analysis(id):
         # Добавляем расшифрованные данные в объект кандидата для передачи в AI API
         candidate.email = candidate_data.email
         candidate.phone = candidate_data.phone
+        # Добавляем остальные данные из запроса
+        candidate.base_answers = candidate_data.base_answers
+        candidate.vacancy_answers = candidate_data.vacancy_answers
+        candidate.soft_answers = candidate_data.soft_answers
+        candidate.cover_letter = candidate_data.cover_letter
+        
+        # Логируем данные для диагностики
+        current_app.logger.info(f"Данные кандидата для анализа: ID={candidate.id}, Email={candidate.email}, Vacancy ID={candidate.vacancy_id}")
+        current_app.logger.info(f"Размер текста резюме: {len(candidate.resume_text) if candidate.resume_text else 0} символов")
         
         # Запрос к OpenAI API
         job_id = request_ai_analysis(candidate)
         
         if job_id:
-            flash('Анализ кандидата успешно завершен', 'success')
-            
             # Создаем уведомление о завершении анализа
             notification = Notification(
-                user_id=current_user.id,
+                candidate_id=candidate.id,
                 type="ai_analysis_completed",
-                content=f"AI-анализ для кандидата {candidate.full_name} завершен",
-                link=url_for('candidates.view', id=candidate.id)
+                message=f"AI-анализ для кандидата {candidate.full_name} завершен",
+                created_at=datetime.datetime.now()
             )
             db.session.add(notification)
             db.session.commit()
+            
+            # Возвращаем JSON ответ для AJAX или перенаправляем
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Анализ кандидата успешно завершен',
+                    'job_id': job_id,
+                    'redirect_url': url_for('candidates.view', id=candidate.id)
+                }), 200
+            
+            flash('Анализ кандидата успешно завершен', 'success')
         else:
+            # Ошибка при запуске анализа
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': 'Произошла ошибка при анализе кандидата. Проверьте настройки API ключа.'}), 500
+            
             flash('Произошла ошибка при анализе кандидата. Проверьте настройки API ключа.', 'danger')
             
     except Exception as e:
-        flash(f'Ошибка при запуске анализа: {str(e)}', 'danger')
-        current_app.logger.error(f"Ошибка при запуске AI-анализа: {str(e)}")
-        
         # Логирование ошибки
+        error_message = f"Ошибка при запуске AI-анализа: {str(e)}"
+        current_app.logger.error(error_message)
+        
         SystemLog.log(
             event_type="ai_analysis_error",
             description=f"Ошибка при запуске AI-анализа кандидата ID={candidate.id}: {str(e)}",
             user_id=current_user.id,
             ip_address=request.remote_addr
         )
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': error_message}), 500
+        
+        flash(error_message, 'danger')
     
+    # Для не-AJAX запросов возвращаем перенаправление
     return redirect(url_for('candidates.view', id=candidate.id))
 
 @candidates_bp.route('/track/<tracking_code>')

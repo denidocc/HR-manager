@@ -2,29 +2,60 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 
-load_dotenv()
+# Принудительно перезагружаем переменные окружения
+load_dotenv(override=True)
+
+# Функция для безопасного получения переменных окружения
+def get_env_variable(name, default=None, required=False):
+    """
+    Безопасно получает переменную окружения с проверкой на заглушки
+    
+    Args:
+        name: Имя переменной окружения
+        default: Значение по умолчанию, если переменная не найдена
+        required: Если True, вызывает исключение при отсутствии переменной
+        
+    Returns:
+        Значение переменной окружения или значение по умолчанию
+    """
+    value = os.environ.get(name, default)
+    
+    # Проверка на заглушки (только для определенных переменных)
+    if name in ['OPENAI_API_KEY', 'SECRET_KEY', 'JWT_SECRET_KEY', 'ENCRYPTION_KEY']:
+        if value and ('your-' in value or 'replace-' in value):
+            # Логирование предупреждения
+            print(f"ВНИМАНИЕ: Переменная {name} содержит заглушку: {value[:10]}...")
+            if required:
+                raise ValueError(f"Требуется реальное значение для {name}. Текущее значение содержит заглушку.")
+            return default
+    
+    # Проверка наличия значения для обязательных переменных
+    if required and not value:
+        raise ValueError(f"Не найдена обязательная переменная окружения: {name}")
+        
+    return value
 
 class Config:
     # Основные настройки Flask
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-replace-in-production')
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True') == 'True'
+    SECRET_KEY = get_env_variable('SECRET_KEY', 'dev-secret-key-replace-in-production')
+    DEBUG = get_env_variable('FLASK_DEBUG', 'True') == 'True'
     
     # Настройки базы данных
-    DB_USER = os.environ.get('DB_USER', 'postgres')
-    DB_PASSWORD = os.environ.get('DB_PASSWORD', 'postgres')
-    DB_HOST = os.environ.get('DB_HOST', 'localhost')
-    DB_PORT = os.environ.get('DB_PORT', '5432')
-    DB_NAME = os.environ.get('DB_NAME', 'hr_manager')
+    DB_USER = get_env_variable('DB_USER', 'postgres')
+    DB_PASSWORD = get_env_variable('DB_PASSWORD', 'postgres')
+    DB_HOST = get_env_variable('DB_HOST', 'localhost')
+    DB_PORT = get_env_variable('DB_PORT', '5432')
+    DB_NAME = get_env_variable('DB_NAME', 'hr_manager')
     
     SQLALCHEMY_DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Настройки шифрования для PostgreSQL pgp_sym_encrypt
-    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', 'pgp-encryption-key-replace-in-production')
-    ENCRYPTION_OPTIONS = os.environ.get('ENCRYPTION_OPTIONS', 'cipher-algo=aes256')
+    ENCRYPTION_KEY = get_env_variable('ENCRYPTION_KEY', 'pgp-encryption-key-replace-in-production')
+    ENCRYPTION_OPTIONS = get_env_variable('ENCRYPTION_OPTIONS', 'cipher-algo=aes256')
     
     # JWT настройки
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-replace-in-production')
+    JWT_SECRET_KEY = get_env_variable('JWT_SECRET_KEY', 'jwt-secret-key-replace-in-production')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=15)
     
     # Настройки загрузки файлов
@@ -33,22 +64,26 @@ class Config:
     ALLOWED_EXTENSIONS = {'pdf', 'docx', 'jpg', 'jpeg', 'png'}
     
     # Email настройки
-    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-    MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
-    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'True') == 'True'
-    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
-    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
-    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@hrmanager.com')
+    MAIL_SERVER = get_env_variable('MAIL_SERVER', 'smtp.gmail.com')
+    MAIL_PORT = int(get_env_variable('MAIL_PORT', 587))
+    MAIL_USE_TLS = get_env_variable('MAIL_USE_TLS', 'True') == 'True'
+    MAIL_USERNAME = get_env_variable('MAIL_USERNAME')
+    MAIL_PASSWORD = get_env_variable('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = get_env_variable('MAIL_DEFAULT_SENDER', 'noreply@hrmanager.com')
     
-    # OpenAI API
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    # OpenAI API - обязательный ключ без заглушек
+    OPENAI_API_KEY = get_env_variable('OPENAI_API_KEY', required=False)
+    
+    # Проверяем наличие OpenAI API ключа на старте
+    if not OPENAI_API_KEY or "your-" in OPENAI_API_KEY or len(OPENAI_API_KEY) < 20:
+        print("ПРЕДУПРЕЖДЕНИЕ: OpenAI API ключ отсутствует или некорректен. Функции AI будут недоступны.")
     
     # Настройки Redis для фоновых задач
-    REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    REDIS_URL = get_env_variable('REDIS_URL', 'redis://localhost:6379/0')
     
     # Настройки логирования
-    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
-    LOG_FILENAME = os.environ.get('LOG_FILENAME', 'app.log')
+    LOG_LEVEL = get_env_variable('LOG_LEVEL', 'INFO')
+    LOG_FILENAME = get_env_variable('LOG_FILENAME', 'app.log')
 
 class DevelopmentConfig(Config):
     DEBUG = True

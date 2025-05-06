@@ -18,6 +18,7 @@ class Candidate(db.Model):
     soft_answers: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: {})
     resume_path: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     resume_text: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
+    cover_letter: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     ai_match_percent: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=True)
     ai_pros: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     ai_cons: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
@@ -46,6 +47,7 @@ class Candidate(db.Model):
     vacancy = so.relationship('Vacancy', back_populates='candidates')
     notifications = so.relationship('Notification', back_populates='candidate', cascade='all, delete-orphan')
     c_candidate_status = so.relationship('C_Candidate_Status', back_populates='candidates')
+    skills = so.relationship('CandidateSkill', back_populates='candidate', cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<Candidate {self.full_name}>'

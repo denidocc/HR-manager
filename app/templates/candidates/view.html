@@ -2,6 +2,26 @@
 
 {% block content %}
 <div class="container-fluid px-4">
+    <!-- CSRF-токен для AJAX-запросов в скрытой форме -->
+    <form id="csrf-form" style="display: none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
+    </form>
+    
+    <!-- Добавляем стили, специфичные для этой страницы -->
+    <style>
+        /* Стили для прогресс-бара */
+        .match-bar-success { background-color: var(--bs-success) !important; }
+        .match-bar-primary { background-color: var(--bs-primary) !important; }
+        .match-bar-info { background-color: var(--bs-info) !important; }
+        .match-bar-warning { background-color: var(--bs-warning) !important; }
+        .match-bar-danger { background-color: var(--bs-danger) !important; }
+        
+        /* Стили для динамического размера ширины */
+        {% for i in range(0, 101) %}
+        .w-{{ i }} { width: {{ i }}% !important; }
+        {% endfor %}
+    </style>
+
     <div class="row mb-4">
         <div class="col-md-12">
             <nav aria-label="breadcrumb">
@@ -36,9 +56,17 @@
                         
                         <dt class="col-sm-4">Статус:</dt>
                         <dd class="col-sm-8">
-                            <span class="badge rounded-pill" 
-                                  style="background-color: {{ candidate.c_candidate_status.color_code if candidate.c_candidate_status else '#6c757d' }}">
+                            <span id="statusBadge" class="badge rounded-pill bg-secondary" 
+                                  data-color="{{ candidate.c_candidate_status.color_code if candidate.c_candidate_status else 'secondary' }}">
                                 {{ candidate.c_candidate_status.name if candidate.c_candidate_status else 'Заявка подана' }}
+                            </span>
+                            <!-- Отладочная информация для проверки цветового кода -->
+                            <span class="d-none">
+                                {% if candidate.c_candidate_status %}
+                                    Цветовой код: {{ candidate.c_candidate_status.color_code }}
+                                {% else %}
+                                    Статус не установлен
+                                {% endif %}
                             </span>
                         </dd>
                         
@@ -55,6 +83,7 @@
                     <div class="mt-4">
                         <h5>Изменить статус</h5>
                         <form method="POST" action="{{ url_for('candidates.change_status', id=candidate.id) }}" class="row g-3">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="col-md-6">
                                 <select name="status_id" class="form-select" required>
                                     {% for status in statuses %}
@@ -80,6 +109,7 @@
                     <div class="mt-4">
                         <h5>Комментарий HR</h5>
                         <form method="POST" action="{{ url_for('candidates.add_comment', id=candidate.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="mb-3">
                                 <textarea name="comment" class="form-control" rows="3" placeholder="Добавьте ваш комментарий">{{ candidate.hr_comment }}</textarea>
                             </div>
@@ -101,17 +131,12 @@
                     <div class="text-center mb-4">
                         <h2>Общая оценка соответствия</h2>
                         <div class="progress mt-3 mb-3" style="height: 30px;">
-                            <div class="progress-bar 
-                                {% if candidate.ai_match_percent >= 80 %}bg-success
-                                {% elif candidate.ai_match_percent >= 60 %}bg-primary
-                                {% elif candidate.ai_match_percent >= 40 %}bg-info
-                                {% elif candidate.ai_match_percent >= 20 %}bg-warning
-                                {% else %}bg-danger{% endif %}" 
-                                role="progressbar" 
-                                style="width: {{ candidate.ai_match_percent }}%;" 
-                                aria-valuenow="{{ candidate.ai_match_percent }}" 
-                                aria-valuemin="0" 
-                                aria-valuemax="100">
+                            <div id="matchProgressBar" class="progress-bar" 
+                                 role="progressbar" 
+                                 aria-valuenow="{{ candidate.ai_match_percent }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100"
+                                 data-percent="{{ candidate.ai_match_percent }}">
                                 <strong>{{ candidate.ai_match_percent }}%</strong>
                             </div>
                         </div>
@@ -176,22 +201,22 @@
                             <tbody>
                                 <tr>
                                     <td>Локация</td>
-                                    <td>{{ candidate.ai_score_location or 'N/A' }}/10</td>
+                                    <td>{{ candidate.ai_score_location or 'N/A' }}/100</td>
                                     <td>{{ candidate.ai_score_comments_location or '' }}</td>
                                 </tr>
                                 <tr>
                                     <td>Опыт работы</td>
-                                    <td>{{ candidate.ai_score_experience or 'N/A' }}/10</td>
+                                    <td>{{ candidate.ai_score_experience or 'N/A' }}/100</td>
                                     <td>{{ candidate.ai_score_comments_experience or '' }}</td>
                                 </tr>
                                 <tr>
                                     <td>Технические навыки</td>
-                                    <td>{{ candidate.ai_score_tech or 'N/A' }}/10</td>
+                                    <td>{{ candidate.ai_score_tech or 'N/A' }}/100</td>
                                     <td>{{ candidate.ai_score_comments_tech or '' }}</td>
                                 </tr>
                                 <tr>
                                     <td>Образование</td>
-                                    <td>{{ candidate.ai_score_education or 'N/A' }}/10</td>
+                                    <td>{{ candidate.ai_score_education or 'N/A' }}/100</td>
                                     <td>{{ candidate.ai_score_comments_education or '' }}</td>
                                 </tr>
                             </tbody>
@@ -212,7 +237,7 @@
                         <div class="alert alert-info">
                             <i class="fas fa-robot me-2"></i>AI-анализ еще не проведен для этого кандидата
                         </div>
-                        <button class="btn btn-primary" onclick="runAIAnalysis({{ candidate.id }})">
+                        <button class="btn btn-primary" id="runAiButton" data-candidate-id="{{ candidate.id }}">
                             <i class="fas fa-brain me-2"></i>Запустить AI-анализ
                         </button>
                     </div>
@@ -238,13 +263,25 @@
                         'education': 'Образование',
                         'desired_salary': 'Желаемая зарплата'
                     } %}
+                    {% set education_translations = {
+                        'secondary': 'Среднее',
+                        'vocational': 'Среднее специальное',
+                        'higher': 'Высшее',
+                        'phd': 'Ученая степень'
+                    } %}
                     <table class="table table-striped">
                         <tbody>
                             {% if candidate.base_answers %}
                                 {% for question, answer in candidate.base_answers.items() %}
                                 <tr>
                                     <td><strong>{{ translations.get(question, question) }}</strong></td>
-                                    <td>{{ answer }}</td>
+                                    <td>
+                                        {% if question == 'education' %}
+                                            {{ education_translations.get(answer, answer) }}
+                                        {% else %}
+                                            {{ answer }}
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
@@ -254,6 +291,14 @@
                             {% endif %}
                         </tbody>
                     </table>
+                    
+                    <!-- Сопроводительное письмо -->
+                    {% if candidate.cover_letter %}
+                    <h5 class="mt-4">Сопроводительное письмо</h5>
+                    <div class="p-3 border rounded bg-light mb-4">
+                        {{ candidate.cover_letter | replace('\n', '<br>') | safe }}
+                    </div>
+                    {% endif %}
                     
                     <!-- Профессиональные вопросы -->
                     <h5 class="mt-4">Профессиональные вопросы</h5>
@@ -335,29 +380,176 @@
 <script>
     // Показ/скрытие поля для даты собеседования в зависимости от выбранного статуса
     document.addEventListener('DOMContentLoaded', function() {
+        // Настройка статуса кандидата
+        const statusBadge = document.getElementById('statusBadge');
+        if (statusBadge) {
+            console.log("Нашли элемент statusBadge:", statusBadge);
+            const colorCode = statusBadge.dataset.color;
+            console.log("Цветовой код из data-color:", colorCode);
+            
+            if (colorCode) {
+                // Проверяем формат цветового кода и преобразуем его при необходимости
+                let cssColor;
+                
+                // Если цвет в формате как #FF0000
+                if (colorCode.startsWith('#')) {
+                    cssColor = colorCode;
+                }
+                // Если цвет в шестнадцатеричном формате без символа #, как FF0000
+                else if (/^[0-9A-Fa-f]{6}$/.test(colorCode)) {
+                    cssColor = '#' + colorCode;
+                }
+                // Если цвет - предопределенное название из Bootstrap
+                else if (['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'].includes(colorCode)) {
+                    statusBadge.className = 'badge rounded-pill bg-' + colorCode;
+                    return; // Выходим после установки класса
+                }
+                // Если не удалось определить формат, используем серый цвет
+                else {
+                    cssColor = '#6c757d'; // Bootstrap secondary color
+                }
+                
+                // Устанавливаем цвет фона напрямую через стиль
+                statusBadge.style.backgroundColor = cssColor;
+                // Удаляем все bg-* классы
+                statusBadge.className = 'badge rounded-pill';
+            } else {
+                // Если цвет не указан, используем стандартный серый
+                statusBadge.style.backgroundColor = '#6c757d';
+            }
+        } else {
+            console.log("Элемент statusBadge не найден");
+        }
+        
+        // Настройка прогресс-бара
+        const matchProgressBar = document.getElementById('matchProgressBar');
+        if (matchProgressBar) {
+            const percent = parseInt(matchProgressBar.dataset.percent);
+            matchProgressBar.style.width = percent + '%';
+            
+            // Выбор цвета в зависимости от процента
+            if (percent >= 80) {
+                matchProgressBar.classList.add('bg-success');
+            } else if (percent >= 60) {
+                matchProgressBar.classList.add('bg-primary');
+            } else if (percent >= 40) {
+                matchProgressBar.classList.add('bg-info');
+            } else if (percent >= 20) {
+                matchProgressBar.classList.add('bg-warning');
+            } else {
+                matchProgressBar.classList.add('bg-danger');
+            }
+        }
+        
+        // Поле даты интервью
         const statusSelect = document.querySelector('select[name="status_id"]');
         const interviewDateContainer = document.getElementById('interviewDateContainer');
         
         // Проверяем начальное состояние
-        checkInterviewStatus();
-        
-        // Добавляем обработчик события
-        statusSelect.addEventListener('change', checkInterviewStatus);
-        
-        function checkInterviewStatus() {
-            // ID статуса "Назначено интервью" = 2
-            if (statusSelect.value == '2') {
-                interviewDateContainer.style.display = 'block';
-            } else {
-                interviewDateContainer.style.display = 'none';
+        if (statusSelect && interviewDateContainer) {
+            checkInterviewStatus();
+            
+            // Добавляем обработчик события
+            statusSelect.addEventListener('change', checkInterviewStatus);
+            
+            function checkInterviewStatus() {
+                // ID статуса "Назначено интервью" = 2
+                if (statusSelect.value == '2') {
+                    interviewDateContainer.style.display = 'block';
+                } else {
+                    interviewDateContainer.style.display = 'none';
+                }
             }
+        }
+        
+        // Кнопка запуска AI-анализа
+        const runAiButton = document.getElementById('runAiButton');
+        if (runAiButton) {
+            runAiButton.addEventListener('click', function() {
+                const candidateId = this.dataset.candidateId;
+                runAIAnalysis(candidateId);
+            });
         }
     });
     
     // Функция для запуска AI-анализа
     function runAIAnalysis(candidateId) {
-        // Здесь будет код для AJAX-запроса на запуск анализа
-        alert('Функциональность запуска AI-анализа будет реализована позже');
+        // Показать индикатор загрузки
+        const aiSection = document.querySelector('.card-body');
+        if (aiSection) {
+            aiSection.innerHTML = `
+                <div class="text-center p-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p class="mt-3">Запускаем AI-анализ кандидата...</p>
+                    <p class="text-muted small">Это может занять до минуты, пожалуйста, подождите</p>
+                </div>
+            `;
+        }
+        
+        // Получаем CSRF-токен из формы
+        const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+        
+        // Отправляем POST запрос на сервер
+        fetch(`/candidates/${candidateId}/start_analysis`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Произошла ошибка при запуске анализа');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('AI анализ успешно завершен:', data);
+            
+            if (data.status === 'success') {
+                // Показываем сообщение об успехе
+                if (aiSection) {
+                    aiSection.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>${data.message}
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-primary mt-3" onclick="window.location.reload()">
+                                <i class="fas fa-sync me-2"></i>Обновить страницу
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                // Автоматически перезагружаем страницу через 2 секунды
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error(data.message || 'Неизвестная ошибка');
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            if (aiSection) {
+                aiSection.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>Произошла ошибка при запуске анализа: ${error.message}
+                    </div>
+                    <div class="text-center">
+                        <button class="btn btn-primary mt-3" onclick="window.location.reload()">
+                            <i class="fas fa-sync me-2"></i>Обновить страницу
+                        </button>
+                    </div>
+                `;
+            }
+        });
     }
 </script>
 {% endblock %} 

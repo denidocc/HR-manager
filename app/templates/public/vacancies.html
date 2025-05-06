@@ -41,6 +41,7 @@
                     <p class="card-text">Уже подавали заявку? Проверьте её статус:</p>
                     
                     <form action="{{ url_for('public_bp.track_result') }}" method="POST" class="mb-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="input-group mb-3">
                             <input type="text" class="form-control" name="tracking_code" placeholder="Введите код отслеживания" required>
                             <button class="btn btn-primary" type="submit">

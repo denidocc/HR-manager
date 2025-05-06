@@ -64,24 +64,24 @@ class ApplicationForm(FlaskForm):
     
     desired_salary = IntegerField('Желаемая зарплата', validators=[
         Optional(),
-        NumberRange(min=0, message='Зарплата должна быть положительным числом')
+        NumberRange(min=0, max=10000000, message='Укажите корректную сумму')
     ])
     
-    # Загрузка резюме
+    # Поле для загрузки резюме
     resume = FileField('Резюме', validators=[
         FileRequired(message='Загрузите файл резюме'),
         FileAllowed(['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'], 
                    message='Допустимые форматы: PDF, DOC, DOCX, JPG, PNG')
     ])
     
-    # Сопроводительное письмо (опционально)
+    # Сопроводительное письмо
     cover_letter = TextAreaField('Сопроводительное письмо', validators=[
         Optional(),
-        Length(max=2000, message='Сопроводительное письмо не должно превышать 2000 символов')
+        Length(max=3000, message='Сопроводительное письмо не должно превышать 3000 символов')
     ])
     
-    # Согласие на обработку данных
-    consent = BooleanField('Я согласен на обработку персональных данных', validators=[
+    # Согласие на обработку персональных данных
+    consent = BooleanField('Я согласен на обработку моих персональных данных', validators=[
         DataRequired(message='Необходимо согласие на обработку персональных данных')
     ])
     

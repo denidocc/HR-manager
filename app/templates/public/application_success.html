@@ -12,7 +12,7 @@
                 </div>
                 <div class="card-body">
                     <div class="alert alert-success mb-4">
-                        <p class="mb-0">Ваша заявка на вакансию <strong>{{ candidate.vacancy.title }}</strong> успешно принята к рассмотрению.</p>
+                        <p class="mb-0">Ваша заявка {% if candidate and candidate.vacancy %}на вакансию <strong>{{ candidate.vacancy.title }}</strong>{% endif %} успешно принята к рассмотрению.</p>
                     </div>
                     
                     <div class="tracking-info p-4 bg-light rounded">

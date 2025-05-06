@@ -9,6 +9,27 @@
         </div>
     </div>
     
+    <!-- Навигация по разделам статистики -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{{ url_for('dashboard_bp.statistics') }}" class="btn btn-primary">
+                            <i class="fas fa-chart-line me-2"></i>Общая статистика
+                        </a>
+                        <a href="{{ url_for('dashboard_bp.recruitment_funnel') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-filter me-2"></i>Воронка найма
+                        </a>
+                        <a href="{{ url_for('dashboard_bp.time_to_fill') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-clock me-2"></i>Время закрытия вакансий
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Графики и аналитика -->
     <div class="row mb-4">
         <div class="col-12">

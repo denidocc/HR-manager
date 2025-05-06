@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="section-heading"><i class="fas fa-filter me-2"></i>Воронка найма</h1>
+            <p class="text-muted">Анализ конверсии кандидатов на каждом этапе процесса найма</p>
+        </div>
+    </div>
+    
+    <!-- Селектор вакансий -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Выберите вакансию для анализа</h5>
+                        <select class="form-select" style="max-width: 300px;" id="vacancySelector">
+                            <option value="all">Все вакансии</option>
+                            {% for vacancy in vacancies %}
+                            <option value="{{ vacancy.id }}">{{ vacancy.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Визуализация воронки -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Воронка найма</h3>
+                </div>
+                <div class="card-body">
+                    <div id="funnelChart" style="height: 400px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Таблица с данными -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Конверсия по этапам</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="conversionTable">
+                            <thead>
+                                <tr>
+                                    <th>Этап</th>
+                                    <th>Кол-во кандидатов</th>
+                                    <th>Конверсия с предыдущего этапа</th>
+                                    <th>Общая конверсия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Данные будут заполнены через JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-funnel@2"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Данные воронки
+    var vacanciesData = {{ vacancies|tojson }};
+    var currentVacancy = vacanciesData[0]; // По умолчанию первая вакансия
+    
+    // Определение этапов воронки
+    var stages = [
+        { name: 'Всего заявок', key: 'total_applications' },
+        { name: 'Рассмотрено', key: 'reviewed' },
+        { name: 'Приглашено', key: 'interview_invited' },
+        { name: 'Интервью проведено', key: 'interviewed' },
+        { name: 'Предложение', key: 'offered' },
+        { name: 'Трудоустроено', key: 'hired' }
+    ];
+    
+    // Функция для обновления воронки
+    function updateFunnel(vacancy) {
+        // Создаем данные для D3-Funnel
+        var data = [];
+        
+        stages.forEach(function(stage) {
+            var stageData = vacancy.funnel.find(function(f) { 
+                return f.stage === stage.name; 
+            });
+            
+            data.push({
+                label: stage.name,
+                value: stageData ? stageData.count : 0
+            });
+        });
+        
+        // Настройки воронки
+        var options = {
+            chart: {
+                animate: 500,
+                curve: {
+                    enabled: true
+                },
+                bottomWidth: 1/3
+            },
+            block: {
+                dynamicHeight: true,
+                fill: {
+                    type: 'gradient',
+                    scale: ['#1A1B41', '#6290C3']
+                },
+                highlight: true
+            },
+            label: {
+                format: '{l}: {f}',
+                fontSize: '14px',
+                fill: '#fff'
+            },
+            tooltip: {
+                enabled: true
+            }
+        };
+        
+        // Очищаем предыдущую воронку
+        document.getElementById('funnelChart').innerHTML = '';
+        
+        // Создаем новую воронку
+        var chart = new D3Funnel('#funnelChart');
+        chart.draw(data, options);
+        
+        // Обновляем таблицу конверсии
+        updateConversionTable(vacancy);
+    }
+    
+    // Обновление таблицы конверсии
+    function updateConversionTable(vacancy) {
+        var tableBody = document.querySelector('#conversionTable tbody');
+        tableBody.innerHTML = '';
+        
+        var funnel = vacancy.funnel;
+        var totalApplications = funnel[0].count;
+        
+        funnel.forEach(function(stage, index) {
+            var row = document.createElement('tr');
+            
+            // Этап
+            var nameCell = document.createElement('td');
+            nameCell.textContent = stage.stage;
+            row.appendChild(nameCell);
+            
+            // Количество
+            var countCell = document.createElement('td');
+            countCell.textContent = stage.count;
+            row.appendChild(countCell);
+            
+            // Конверсия с предыдущего этапа
+            var prevConversionCell = document.createElement('td');
+            if (index > 0 && funnel[index - 1].count > 0) {
+                var prevConversion = (stage.count / funnel[index - 1].count * 100).toFixed(1);
+                prevConversionCell.textContent = prevConversion + '%';
+                
+                // Цветовая индикация
+                if (prevConversion < 30) {
+                    prevConversionCell.classList.add('text-danger');
+                } else if (prevConversion > 70) {
+                    prevConversionCell.classList.add('text-success');
+                }
+            } else {
+                prevConversionCell.textContent = '-';
+            }
+            row.appendChild(prevConversionCell);
+            
+            // Общая конверсия
+            var totalConversionCell = document.createElement('td');
+            if (totalApplications > 0) {
+                var totalConversion = (stage.count / totalApplications * 100).toFixed(1);
+                totalConversionCell.textContent = totalConversion + '%';
+            } else {
+                totalConversionCell.textContent = '-';
+            }
+            row.appendChild(totalConversionCell);
+            
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // Обработчик изменения вакансии
+    document.getElementById('vacancySelector').addEventListener('change', function() {
+        var selectedId = this.value;
+        if (selectedId === 'all') {
+            // Объединяем данные всех вакансий
+            var combinedFunnel = [];
+            
+            stages.forEach(function(stage, i) {
+                var totalCount = 0;
+                
+                vacanciesData.forEach(function(vacancy) {
+                    if (vacancy.funnel[i]) {
+                        totalCount += vacancy.funnel[i].count || 0;
+                    }
+                });
+                
+                combinedFunnel.push({
+                    stage: stage.name,
+                    count: totalCount
+                });
+            });
+            
+            updateFunnel({
+                id: 'all',
+                title: 'Все вакансии',
+                funnel: combinedFunnel
+            });
+        } else {
+            // Находим выбранную вакансию
+            var selectedVacancy = null;
+            
+            for (var i = 0; i < vacanciesData.length; i++) {
+                if (vacanciesData[i].id == selectedId) {
+                    selectedVacancy = vacanciesData[i];
+                    break;
+                }
+            }
+            
+            if (selectedVacancy) {
+                updateFunnel(selectedVacancy);
+            }
+        }
+    });
+    
+    // Инициализация при загрузке
+    if (vacanciesData.length > 0) {
+        updateFunnel(currentVacancy);
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    #funnelChart {
+        width: 100%;
+        height: 400px;
+    }
+    
+    .funnel-label {
+        font-family: 'Roboto', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+    }
+</style>
+{% endblock %} 

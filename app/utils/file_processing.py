@@ -108,26 +108,9 @@ def extract_text_from_docx(file_path):
         return None
 
 def extract_text_from_image(file_path):
-    """Извлечение текста из изображения (OCR)"""
-    try:
-        from PIL import Image
-        import pytesseract
-        
-        # Проверяем наличие пути к Tesseract
-        if not current_app.config.get('TESSERACT_CMD_PATH'):
-            return "Путь к Tesseract OCR не настроен"
-        
-        # Устанавливаем путь к Tesseract
-        pytesseract.pytesseract.tesseract_cmd = current_app.config['TESSERACT_CMD_PATH']
-        
-        # Читаем изображение и применяем OCR
-        image = Image.open(file_path)
-        text = pytesseract.image_to_string(image, lang='rus+eng')
-        
-        return text
-    except ImportError:
-        current_app.logger.error("Pillow или pytesseract не установлены. Установите: pip install pillow pytesseract")
-        return "Извлечение текста из изображений недоступно. Установите необходимые библиотеки."
-    except Exception as e:
-        current_app.logger.error(f"Ошибка при извлечении текста из изображения: {str(e)}")
-        return None 
+    """Извлечение текста из изображения (OCR) - временно отключено"""
+    current_app.logger.info(f"Получен запрос на извлечение текста из изображения: {file_path}")
+    current_app.logger.info("Функция извлечения текста из изображений временно отключена")
+    
+    # Возвращаем стандартный текст, указывая, что это изображение
+    return "Это изображение. Извлечение текста из изображений временно отключено. Оригинальный файл сохранен и доступен для скачивания." 

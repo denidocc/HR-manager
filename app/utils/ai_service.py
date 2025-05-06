@@ -7,94 +7,155 @@ import os
 from flask import current_app
 import re
 import random
+from openai import OpenAI
+import uuid
+import time
 
-def request_ai_analysis(resume_text, vacancy_description):
+def request_ai_analysis(candidate):
     """
-    Отправляет текст резюме и описание вакансии на анализ с использованием AI
+    Отправляет данные кандидата на анализ с использованием OpenAI API
     и возвращает результаты анализа.
     
-    В реальном приложении здесь был бы код для работы с API нейросети,
-    но для демонстрационных целей мы используем заглушку.
-    
     Args:
-        resume_text (str): Текст резюме кандидата
-        vacancy_description (str): Описание вакансии
+        candidate: Объект кандидата с данными для анализа
         
     Returns:
-        dict: Результаты анализа, включая процент соответствия и ключевые навыки
+        dict: Результаты анализа, включая процент соответствия и рекомендации
     """
-    # В реальном приложении здесь был бы запрос к AI-сервису
     try:
-        # Эмуляция обработки и анализа
-        # В реальном приложении здесь был бы код для отправки запроса к API нейросети
+        # Получаем API ключ из конфигурации
+        api_key = current_app.config.get('OPENAI_API_KEY')
+        if not api_key:
+            current_app.logger.error("OpenAI API ключ не найден в конфигурации")
+            return None
+            
+        # Инициализация клиента OpenAI
+        client = OpenAI(api_key=api_key)
         
-        # Извлекаем ключевые слова для эмуляции анализа
-        skills_pattern = r'(Python|Java|JavaScript|SQL|HTML|CSS|React|Angular|Vue|Flask|Django|Spring|AI|ML)'
-        resume_skills = set(re.findall(skills_pattern, resume_text, re.IGNORECASE))
-        vacancy_skills = set(re.findall(skills_pattern, vacancy_description, re.IGNORECASE))
+        # Получаем данные вакансии
+        vacancy = candidate.vacancy
         
-        # Находим совпадающие навыки
-        matching_skills = resume_skills.intersection(vacancy_skills)
+        # Формируем запрос для анализа
+        prompt = f"""
+        Проанализируй соответствие кандидата требованиям вакансии и оцени по 100-балльной шкале.
         
-        # Эмулируем процент соответствия
-        if len(vacancy_skills) == 0:
-            match_percent = random.randint(50, 90)
-        else:
-            match_percent = int(len(matching_skills) / len(vacancy_skills) * 100)
-            # Добавляем немного случайности
-            match_percent = min(100, match_percent + random.randint(-10, 10))
+        ВАКАНСИЯ:
+        Название: {vacancy.title}
+        Тип занятости: {vacancy.employment_type}
+        Описание задач: {vacancy.job_description}
+        Условия работы: {vacancy.conditions}
+        Требования к кандидату: {vacancy.requirements}
         
-        # Формируем результаты анализа
-        analysis_results = {
-            'match_percent': match_percent,
-            'matching_skills': list(matching_skills),
-            'missing_skills': list(vacancy_skills - resume_skills),
-            'additional_skills': list(resume_skills - vacancy_skills),
-            'summary': generate_ai_summary(resume_text, vacancy_description, match_percent)
+        КАНДИДАТ:
+        ФИО: {candidate.full_name}
+        Город: {candidate.location}
+        Опыт работы: {candidate.experience_years} лет
+        Образование: {candidate.education}
+        
+        Ответы на профессиональные вопросы:
+        {candidate.professional_answers}
+        
+        Ответы на вопросы о личных качествах:
+        {candidate.soft_skills_answers}
+        
+        Сопроводительное письмо:
+        {candidate.cover_letter}
+        
+        Текст резюме:
+        {candidate.resume_text}
+        
+        Проведи детальный анализ и предоставь следующую информацию:
+        1. Общий процент соответствия кандидата вакансии (от 0 до 100)
+        2. Сильные стороны кандидата (список из 3-5 пунктов)
+        3. Слабые стороны или области для развития (список из 3-5 пунктов)
+        4. Рекомендация по кандидату (принять/отклонить/рассмотреть)
+        5. Оценки по категориям (от 1 до 10):
+           - Локация (насколько местоположение кандидата соответствует требованиям)
+           - Опыт работы (релевантность и достаточность)
+           - Технические навыки (соответствие требуемым навыкам)
+           - Образование (релевантность и уровень)
+        6. Комментарии по каждой категории
+        7. Примечания о несоответствии (если есть)
+        
+        Формат ответа должен быть строго в JSON:
+        {
+            "match_percent": число,
+            "pros": ["пункт1", "пункт2", ...],
+            "cons": ["пункт1", "пункт2", ...],
+            "recommendation": "текст рекомендации",
+            "scores": {
+                "location": число,
+                "experience": число,
+                "tech": число,
+                "education": число
+            },
+            "comments": {
+                "location": "текст",
+                "experience": "текст",
+                "tech": "текст",
+                "education": "текст"
+            },
+            "mismatch_notes": "текст о несоответствиях"
         }
+        """
         
-        current_app.logger.info(f"AI анализ выполнен успешно, соответствие: {match_percent}%")
-        return analysis_results
+        # Отправляем запрос к OpenAI API
+        current_app.logger.info(f"Отправка запроса к OpenAI API для анализа кандидата ID={candidate.id}")
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Используем мощную модель для анализа
+            messages=[
+                {"role": "system", "content": "Ты - HR-аналитик, специализирующийся на оценке соответствия кандидатов требованиям вакансий."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        # Получаем и парсим ответ
+        result_text = response.choices[0].message.content
+        result = json.loads(result_text)
+        
+        # Сохраняем результаты анализа в базу данных
+        candidate.ai_match_percent = result["match_percent"]
+        candidate.ai_pros = "\n".join(result["pros"])
+        candidate.ai_cons = "\n".join(result["cons"])
+        candidate.ai_recommendation = result["recommendation"]
+        
+        # Сохраняем оценки по категориям
+        candidate.ai_score_location = result["scores"]["location"]
+        candidate.ai_score_experience = result["scores"]["experience"]
+        candidate.ai_score_tech = result["scores"]["tech"]
+        candidate.ai_score_education = result["scores"]["education"]
+        
+        # Сохраняем комментарии
+        candidate.ai_score_comments_location = result["comments"]["location"]
+        candidate.ai_score_comments_experience = result["comments"]["experience"]
+        candidate.ai_score_comments_tech = result["comments"]["tech"]
+        candidate.ai_score_comments_education = result["comments"]["education"]
+        
+        # Сохраняем примечания о несоответствии
+        candidate.ai_mismatch_notes = result["mismatch_notes"]
+        
+        # Сохраняем изменения в базе данных
+        from app import db
+        db.session.commit()
+        
+        current_app.logger.info(f"AI анализ выполнен успешно, соответствие: {candidate.ai_match_percent}%")
+        
+        # Генерируем уникальный ID для задачи анализа
+        job_id = str(uuid.uuid4())
+        return job_id
         
     except Exception as e:
         current_app.logger.error(f"Ошибка при выполнении AI анализа: {str(e)}")
-        return {
-            'match_percent': 0,
-            'matching_skills': [],
-            'missing_skills': [],
-            'additional_skills': [],
-            'summary': "Не удалось выполнить анализ",
-            'error': str(e)
-        }
-
-def generate_ai_summary(resume_text, vacancy_description, match_percent):
-    """
-    Генерирует краткое резюме анализа на основе текста резюме и описания вакансии.
-    
-    Args:
-        resume_text (str): Текст резюме кандидата
-        vacancy_description (str): Описание вакансии
-        match_percent (int): Процент соответствия
-        
-    Returns:
-        str: Текстовое резюме анализа
-    """
-    # Заглушки для различных уровней соответствия
-    if match_percent >= 90:
-        return "Кандидат отлично подходит для данной позиции. Имеет все требуемые навыки и опыт работы."
-    elif match_percent >= 70:
-        return "Кандидат хорошо подходит для данной позиции. Обладает большинством требуемых навыков."
-    elif match_percent >= 50:
-        return "Кандидат может подойти для данной позиции, но не обладает некоторыми ключевыми навыками."
-    else:
-        return "Кандидат не соответствует требованиям позиции. Рекомендуется рассмотреть других кандидатов."
+        return None
 
 def get_analysis_status(analysis_id):
     """
     Проверяет статус анализа по его идентификатору.
     
-    В реальном приложении здесь был бы запрос к API для проверки статуса задачи анализа.
-    Для демонстрационных целей мы всегда возвращаем завершенный статус.
+    В текущей реализации анализ выполняется синхронно,
+    поэтому всегда возвращаем завершенный статус.
     
     Args:
         analysis_id (str): Идентификатор задачи анализа
@@ -102,17 +163,14 @@ def get_analysis_status(analysis_id):
     Returns:
         dict: Информация о статусе анализа
     """
-    # Эмуляция проверки статуса
     try:
-        # В реальном приложении здесь был бы запрос к API
-        
-        # Для демонстрации всегда возвращаем, что анализ завершен
+        # Для текущей реализации всегда возвращаем, что анализ завершен
         status_info = {
             'status': 'completed',
             'progress': 100,
             'analysis_id': analysis_id,
-            'started_at': '2023-01-01T12:00:00',
-            'completed_at': '2023-01-01T12:05:00'
+            'started_at': time.strftime('%Y-%m-%dT%H:%M:%S'),
+            'completed_at': time.strftime('%Y-%m-%dT%H:%M:%S')
         }
         
         return status_info
@@ -123,4 +181,60 @@ def get_analysis_status(analysis_id):
             'status': 'error',
             'error': str(e),
             'analysis_id': analysis_id
-        } 
+        }
+
+def analyze_vacancy_requirements(vacancy_description):
+    """
+    Анализирует требования вакансии с помощью OpenAI API
+    для извлечения ключевых навыков и требований.
+    
+    Args:
+        vacancy_description (str): Описание вакансии
+        
+    Returns:
+        dict: Извлеченные требования и навыки
+    """
+    try:
+        # Получаем API ключ из конфигурации
+        api_key = current_app.config.get('OPENAI_API_KEY')
+        if not api_key:
+            current_app.logger.error("OpenAI API ключ не найден в конфигурации")
+            return None
+            
+        # Инициализация клиента OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        prompt = f"""
+        Проанализируй описание вакансии и извлеки из него ключевые требования и навыки.
+        
+        ОПИСАНИЕ ВАКАНСИИ:
+        {vacancy_description}
+        
+        Предоставь результат в следующем формате JSON:
+        {{
+            "required_skills": ["навык1", "навык2", ...],
+            "preferred_skills": ["навык1", "навык2", ...],
+            "experience_years": число,
+            "education_level": "уровень образования",
+            "key_responsibilities": ["обязанность1", "обязанность2", ...],
+            "location_requirements": "требования к локации"
+        }}
+        """
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Ты - HR-аналитик, специализирующийся на анализе вакансий."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        result_text = response.choices[0].message.content
+        result = json.loads(result_text)
+        
+        return result
+        
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при анализе требований вакансии: {str(e)}")
+        return None 

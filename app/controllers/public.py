@@ -208,10 +208,18 @@ def apply(vacancy_id):
                 if filename:
                     candidate.resume_path = filename
                     
-                    # Извлекаем текст из резюме
-                    resume_text = extract_text_from_resume(filename)
-                    if resume_text:
-                        candidate.resume_text = resume_text
+                    # Получаем расширение файла
+                    file_extension = os.path.splitext(filename)[1].lower()
+                    
+                    # Для изображений (jpg, jpeg, png) не пытаемся извлекать текст
+                    if file_extension not in ['.jpg', '.jpeg', '.png']:
+                        # Извлекаем текст из резюме для других форматов
+                        resume_text = extract_text_from_resume(filename)
+                        if resume_text:
+                            candidate.resume_text = resume_text
+                    else:
+                        # Для изображений просто сохраняем информативное сообщение
+                        candidate.resume_text = "Файл резюме загружен в формате изображения и доступен для просмотра."
             
             # Сохраняем кандидата
             db.session.add(candidate)

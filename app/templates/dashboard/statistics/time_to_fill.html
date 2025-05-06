@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="section-heading"><i class="fas fa-clock me-2"></i>Время закрытия вакансий</h1>
+            <p class="text-muted">Анализ эффективности процесса найма по времени закрытия вакансий</p>
+        </div>
+    </div>
+    
+    <!-- Ключевые показатели -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Среднее время закрытия</h5>
+                    <p class="display-4 mt-3">{{ avg_time|round|int }} <small class="text-muted">дней</small></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Медианное время</h5>
+                    <p class="display-4 mt-3">{{ median_time|round|int }} <small class="text-muted">дней</small></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Закрыто вакансий</h5>
+                    <p class="display-4 mt-3">{{ time_data|length }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- График динамики -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Динамика времени закрытия вакансий</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="timeToFillChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Таблица с данными -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Детализация по вакансиям</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped" id="timeToFillTable">
+                            <thead>
+                                <tr>
+                                    <th>Вакансия</th>
+                                    <th>Дата создания</th>
+                                    <th>Дата закрытия</th>
+                                    <th>Дней до закрытия</th>
+                                    <th>Эффективность</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vacancy in time_data %}
+                                <tr>
+                                    <td>{{ vacancy.title }}</td>
+                                    <td>{{ vacancy.created_at.strftime('%d.%m.%Y') }}</td>
+                                    <td>{{ vacancy.closed_at.strftime('%d.%m.%Y') }}</td>
+                                    <td>{{ vacancy.days_to_fill|round|int }}</td>
+                                    <td>
+                                        {% if vacancy.days_to_fill < avg_time * 0.7 %}
+                                            <span class="badge bg-success">Отлично</span>
+                                        {% elif vacancy.days_to_fill < avg_time %}
+                                            <span class="badge bg-primary">Хорошо</span>
+                                        {% elif vacancy.days_to_fill < avg_time * 1.5 %}
+                                            <span class="badge bg-warning">Средне</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Долго</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Данные для графика по месяцам
+    const monthlyData = {{ monthly_data|tojson }};
+    const labels = monthlyData.map(item => item.month);
+    const data = monthlyData.map(item => item.days_to_fill);
+    
+    // График времени закрытия вакансий
+    const timeToFillChart = new Chart(
+        document.getElementById('timeToFillChart'),
+        {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Среднее время закрытия (дни)',
+                    data: data,
+                    fill: true,
+                    backgroundColor: 'rgba(98, 144, 195, 0.2)',
+                    borderColor: 'rgba(98, 144, 195, 1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Динамика времени закрытия вакансий по месяцам'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.raw.toFixed(1)} дней`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Дни'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Месяц'
+                        }
+                    }
+                }
+            }
+        }
+    );
+    
+    // Добавляем горизонтальную линию для среднего значения
+    const avgTime = {{ avg_time }};
+    timeToFillChart.data.datasets.push({
+        label: 'Среднее за весь период',
+        data: Array(labels.length).fill(avgTime),
+        fill: false,
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderDash: [5, 5],
+        borderWidth: 2,
+        pointRadius: 0
+    });
+    timeToFillChart.update();
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .badge {
+        font-size: 0.9rem;
+        padding: 0.5em 0.8em;
+    }
+</style>
+{% endblock %} 

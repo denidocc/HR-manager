@@ -70,7 +70,7 @@
                                     </td>
                                     <td>{{ candidate.created_at.strftime('%d.%m.%Y') }}</td>
                                     <td>
-                                        <a href="#" class="btn btn-sm btn-outline-primary">Просмотр</a>
+                                        <a href="{{ url_for('candidates.view', id=candidate.id) }}" class="btn btn-sm btn-outline-primary">Просмотр</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -110,7 +110,7 @@
                                     <td>{{ title }}</td>
                                     <td>{{ count }}</td>
                                     <td>
-                                        <a href="#" class="btn btn-sm btn-outline-primary">Просмотр</a>
+                                        <a href="{{ url_for('vacancies.view', id=vacancy_id) }}" class="btn btn-sm btn-outline-primary">Просмотр</a>
                                     </td>
                                 </tr>
                                 {% endfor %}

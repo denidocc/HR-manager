@@ -232,15 +232,21 @@
                 <div class="card-body">
                     <!-- Базовые ответы -->
                     <h5>Базовая информация</h5>
+                    {% set translations = {
+                        'location': 'Местоположение',
+                        'experience_years': 'Опыт работы (лет)',
+                        'education': 'Образование',
+                        'desired_salary': 'Желаемая зарплата'
+                    } %}
                     <table class="table table-striped">
                         <tbody>
                             {% if candidate.base_answers %}
-                            {% for question, answer in candidate.base_answers.items() %}
-                            <tr>
-                                <td><strong>{{ question }}</strong></td>
-                                <td>{{ answer }}</td>
-                            </tr>
-                            {% endfor %}
+                                {% for question, answer in candidate.base_answers.items() %}
+                                <tr>
+                                    <td><strong>{{ translations.get(question, question) }}</strong></td>
+                                    <td>{{ answer }}</td>
+                                </tr>
+                                {% endfor %}
                             {% else %}
                             <tr>
                                 <td colspan="2">Нет данных</td>

@@ -139,4 +139,9 @@ def delete_file(filename):
         ip_address=request.remote_addr
     )
     
-    return jsonify({'status': 'success', 'message': 'Файл успешно удален'}), 200 
+    return jsonify({'status': 'success', 'message': 'Файл успешно удален'}), 200
+
+@files_bp.route('/download_resume/<filename>')
+def download_resume(filename):
+    """Скачивание файла резюме (для обратной совместимости)"""
+    return download_file(filename) 

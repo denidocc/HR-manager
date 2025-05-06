@@ -72,10 +72,17 @@
                     <div class="notifications mb-4">
                         <h4 class="section-heading">Уведомления</h4>
                         <div class="list-group">
+                            {% set notification_types = {
+                                'application_received': 'Заявка получена',
+                                'status_update': 'Обновление статуса',
+                                'interview_invitation': 'Приглашение на интервью',
+                                'rejection': 'Отказ',
+                                'offer': 'Предложение о работе'
+                            } %}
                             {% for notification in candidate.notifications %}
                                 <div class="list-group-item">
                                     <div class="d-flex w-100 justify-content-between">
-                                        <h5 class="mb-1">{{ notification.type|replace('_', ' ')|title }}</h5>
+                                        <h5 class="mb-1">{{ notification_types.get(notification.type, notification.type|replace('_', ' ')|title) }}</h5>
                                         <small>{{ notification.created_at.strftime('%d.%m.%Y') }}</small>
                                     </div>
                                     <p class="mb-1">{{ notification.message }}</p>

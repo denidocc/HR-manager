@@ -32,7 +32,7 @@ class Candidate(db.Model):
     ai_score_comments_tech: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     ai_score_comments_education: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     ai_mismatch_notes: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
-    id_c_candidate_status: so.Mapped[int] = so.mapped_column(sa.Integer, sa.ForeignKey('c_candidate_status.id'), nullable=False, default=1)
+    id_c_candidate_status: so.Mapped[int] = so.mapped_column(sa.Integer, sa.ForeignKey('c_candidate_status.id'), nullable=False, default=0)
     interview_date: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), nullable=True)
     hr_comment: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     created_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

@@ -13,6 +13,8 @@ import os
 from werkzeug.utils import secure_filename
 from wtforms import TextAreaField
 from wtforms.validators import DataRequired, Optional
+from sqlalchemy import and_, func, cast
+import sqlalchemy as sa
 
 public_bp = Blueprint('public_bp', __name__, url_prefix='')
 
@@ -150,6 +152,23 @@ def apply(vacancy_id):
                     # Устанавливаем значение из запроса
                     getattr(form, field_name).data = request.form.get(field_name)
     
+    # Проверяем, не подавал ли уже кандидат заявку на эту вакансию
+    existing_application = db.session.query(Candidate).filter(
+        and_(
+            Candidate.vacancy_id == vacancy.id,
+            func.pgp_sym_decrypt(
+                cast(Candidate._phone, sa.LargeBinary),
+                current_app.config['ENCRYPTION_KEY'],
+                current_app.config.get('ENCRYPTION_OPTIONS', '')
+            ) == form.phone.data,
+            Candidate.id_c_candidate_status != 3  # Разрешаем повторную подачу, если предыдущая была отклонена
+        )
+    ).first()
+
+    if existing_application:
+        flash('Вы уже подавали заявку на эту вакансию с этим номером телефона, пожалуйста, ждите ответа от HR-менеджера', 'warning')
+        return redirect(url_for('public_bp.vacancy', vacancy_id=vacancy_id))
+
     if form.validate_on_submit():
         try:
             # Сохраняем базовую информацию
@@ -216,7 +235,7 @@ def apply(vacancy_id):
                 soft_answers=soft_answers,
                 cover_letter=form.cover_letter.data,
                 resume_path=resume_path,
-                id_c_candidate_status=1  # Статус "Новая заявка"
+                id_c_candidate_status=0  # Статус "Новая заявка"
             )
             
             # Сохраняем кандидата

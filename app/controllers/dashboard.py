@@ -62,7 +62,7 @@ def index():
         and_(
             Candidate.interview_date != None,
             Candidate.interview_date >= datetime.datetime.now(),
-            Candidate.id_c_candidate_status == 1  # ID статуса "Назначено интервью"
+            Candidate.id_c_candidate_status == 2  # ID статуса "Назначено интервью"
         )
     ).order_by(Candidate.interview_date).all()
     
@@ -386,11 +386,12 @@ def recruitment_funnel():
         Vacancy.id,
         Vacancy.title,
         func.count(Candidate.id).label('total_applications'),
-        func.sum(case([(Candidate.id_c_candidate_status >= 1, 1)], else_=0)).label('reviewed'),
-        func.sum(case([(Candidate.id_c_candidate_status >= 2, 1)], else_=0)).label('interview_invited'),
-        func.sum(case([(Candidate.id_c_candidate_status >= 3, 1)], else_=0)).label('interviewed'),
+        func.sum(case([(Candidate.id_c_candidate_status == 0, 1)], else_=0)).label('new_applications'),
+        func.sum(case([(Candidate.id_c_candidate_status == 1, 1)], else_=0)).label('reviewed'),
+        func.sum(case([(Candidate.id_c_candidate_status == 2, 1)], else_=0)).label('interview_invited'),
+        func.sum(case([(Candidate.id_c_candidate_status == 5, 1)], else_=0)).label('interviewed'),
         func.sum(case([(Candidate.id_c_candidate_status == 4, 1)], else_=0)).label('offered'),
-        func.sum(case([(Candidate.id_c_candidate_status == 5, 1)], else_=0)).label('hired')
+        func.sum(case([(Candidate.id_c_candidate_status == 3, 1)], else_=0)).label('hired')
     ).join(
         Candidate, Vacancy.id == Candidate.vacancy_id
     )
@@ -410,6 +411,7 @@ def recruitment_funnel():
             'title': data.title,
             'funnel': [
                 {'stage': 'Всего заявок', 'count': data.total_applications},
+                {'stage': 'Новые заявки', 'count': data.new_applications},
                 {'stage': 'Рассмотрено', 'count': data.reviewed},
                 {'stage': 'Приглашено', 'count': data.interview_invited},
                 {'stage': 'Интервью проведено', 'count': data.interviewed},

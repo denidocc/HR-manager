@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - HRAI</title>
+    <title>{{ title }} - Clever HR</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/colors.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head> 
 <body>
     <div class="container">
         <div class="logo">
-            <h1>HRAI</h1>
+            <h1>Clever HR</h1>
         </div>
         <div class="subtitle">
             Умная система управления персоналом
@@ -20,7 +20,7 @@
             <a href="{{ url_for('auth_bp.login' if not current_user.is_authenticated else 'dashboard_bp.index') }}" class="btn btn-accent">Вы HR?</a>
         </div>
         <div class="subtitle">
-            &copy; 2025 HRAI. Все права защищены.
+            &copy; 2025 Clever HR. Все права защищены.
         </div>
     </div>
 </body>

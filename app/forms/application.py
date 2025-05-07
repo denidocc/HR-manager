@@ -1,18 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+from flask import current_app
+from app import db
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired, FileAllowed
 from wtforms import StringField, TextAreaField, IntegerField, SelectField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional, ValidationError
 import re
+from app.models import C_Education, C_Gender
 
 # Валидатор для телефонных номеров
 def validate_phone(form, field):
-    """Проверяет, что номер телефона имеет допустимый формат"""
-    phone_regex = re.compile(r'^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$')
+    """Проверяет, что номер телефона соответствует формату Туркменистана (+993XXXXXXXX)"""
+    phone_regex = re.compile(r'^\+993\d{8}$')
     if not phone_regex.match(field.data):
-        raise ValidationError('Введите корректный номер телефона')
+        raise ValidationError('Введите номер телефона в формате +993XXXXXXXX')
 
 # Валидатор для имени
 def validate_name(form, field):
@@ -25,7 +27,7 @@ class ApplicationForm(FlaskForm):
     # Основная информация
     full_name = StringField('ФИО', validators=[
         DataRequired(message='Введите ваше ФИО'),
-        Length(min=5, max=100, message='ФИО должно содержать от 5 до 100 символов'),
+        Length(min=3, max=100, message='ФИО должно содержать от 3 до 100 символов'),
         validate_name
     ])
     
@@ -51,20 +53,17 @@ class ApplicationForm(FlaskForm):
         NumberRange(min=0, max=50, message='Опыт работы должен быть от 0 до 50 лет')
     ])
     
-    education = SelectField('Образование', 
-        choices=[
-            ('', 'Выберите уровень образования'),
-            ('secondary', 'Среднее'),
-            ('vocational', 'Среднее специальное'),
-            ('higher', 'Высшее'),
-            ('phd', 'Ученая степень')
-        ],
-        validators=[DataRequired(message='Выберите уровень образования')]
-    )
+    education = SelectField('Образование', validators=[
+        DataRequired(message='Выберите уровень образования')
+    ])
     
     desired_salary = IntegerField('Желаемая зарплата', validators=[
         Optional(),
         NumberRange(min=0, max=10000000, message='Укажите корректную сумму')
+    ])
+    
+    gender = SelectField('Пол', validators=[
+        DataRequired(message='Выберите пол')
     ])
     
     # Поле для загрузки резюме
@@ -97,5 +96,11 @@ class ApplicationForm(FlaskForm):
                 field.data.seek(0)  # Возвращаем указатель файла в начало
                 raise ValidationError('Размер файла не должен превышать 5MB')
             field.data.seek(0)  # Возвращаем указатель файла в начало
+    
+    def __init__(self, *args, **kwargs):
+        super(ApplicationForm, self).__init__(*args, **kwargs)
+        # Заполняем списки выбора динамически при создании формы
+        self.education.choices = [(c.id, c.name) for c in C_Education.query.all()]
+        self.gender.choices = [(c.id, c.name) for c in C_Gender.query.all()]
     
     submit = SubmitField('Отправить заявку') 

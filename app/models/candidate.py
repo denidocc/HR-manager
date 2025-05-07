@@ -37,7 +37,8 @@ class Candidate(db.Model):
     hr_comment: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     created_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    tracking_code: so.Mapped[str] = so.mapped_column(sa.Text, default=lambda: str(uuid.uuid4()), unique=True)
+    tracking_code: so.Mapped[str] = so.mapped_column(sa.Text, unique=True)
+    gender: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     
     # Свойства для шифрованных полей
     email = encrypted_property('email')

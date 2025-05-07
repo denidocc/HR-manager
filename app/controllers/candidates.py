@@ -217,8 +217,8 @@ def view(id):
         'resume_text': candidate_data.resume_text,
         'cover_letter': candidate_data.cover_letter,
         'ai_match_percent': candidate_data.ai_match_percent,
-        'ai_pros': candidate_data.ai_pros,
-        'ai_cons': candidate_data.ai_cons,
+        'ai_pros': candidate_data.ai_pros.replace('{', '').replace('}', '').replace('"', '').split(',') if candidate_data.ai_pros else [],
+        'ai_cons': candidate_data.ai_cons.replace('{', '').replace('}', '').replace('"', '').split(',') if candidate_data.ai_cons else [],
         'ai_recommendation': candidate_data.ai_recommendation,
         'ai_score_location': candidate_data.ai_score_location,
         'ai_score_experience': candidate_data.ai_score_experience,
@@ -475,14 +475,14 @@ def start_analysis(id):
         job_id = request_ai_analysis(candidate)
         
         if job_id:
-            # Создаем уведомление о завершении анализа
-            notification = Notification(
-                candidate_id=candidate.id,
-                type="ai_analysis_completed",
-                message=f"AI-анализ для кандидата {candidate.full_name} завершен",
-                created_at=datetime.datetime.now()
-            )
-            db.session.add(notification)
+            # # Создаем уведомление о завершении анализа
+            # notification = Notification(
+            #     candidate_id=candidate.id,
+            #     type="ai_analysis_completed",
+            #     message=f"AI-анализ для кандидата {candidate.full_name} завершен",
+            #     created_at=datetime.datetime.now()
+            # )
+            # db.session.add(notification)
             db.session.commit()
             
             # Возвращаем JSON ответ для AJAX или перенаправляем

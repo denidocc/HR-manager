@@ -160,14 +160,14 @@ def request_ai_analysis(candidate):
         Опыт работы: {experience_years}
         Образование: {education_text}
         
-        Профессиональные вопросы и ответы:
+        Профессиональные вопросы и ответы (Очень важно учитывать эти ответы при оценке):
         {professional_answers}
         
-        Вопросы о soft skills и ответы:
+        Вопросы о soft skills и ответы (Очень важно учитывать эти ответы при оценке):
         {soft_skills_answers}
         
         РЕЗЮМЕ КАНДИДАТА:
-        {candidate.resume_text[:3000] if candidate.resume_text else 'Не предоставлено'}
+        {candidate.resume_text[:10000] if candidate.resume_text else 'Не предоставлено'}
         
         {f"СОПРОВОДИТЕЛЬНОЕ ПИСЬМО:\n{candidate.cover_letter[:3000]}" if candidate.cover_letter else ""}
         

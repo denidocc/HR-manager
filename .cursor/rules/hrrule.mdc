@@ -6,7 +6,7 @@ alwaysApply: true
 Search files...
 # Правила структурирования проекта Flask с PostgreSQL
 
-# Название проекта: HRAI
+# Название проекта: Clever HR
 
 ## 1. Структура файлов и каталогов
 

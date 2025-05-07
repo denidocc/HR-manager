@@ -127,111 +127,180 @@
                     <h4 class="mb-0">AI-анализ соответствия</h4>
                 </div>
                 <div class="card-body">
-                    {% if candidate.ai_match_percent %}
-                    <div class="text-center mb-4">
-                        <h2>Общая оценка соответствия</h2>
-                        <div class="progress mt-3 mb-3" style="height: 30px;">
-                            <div id="matchProgressBar" class="progress-bar" 
-                                 role="progressbar" 
-                                 aria-valuenow="{{ candidate.ai_match_percent }}" 
-                                 aria-valuemin="0" 
-                                 aria-valuemax="100"
-                                 data-percent="{{ candidate.ai_match_percent }}">
-                                <strong>{{ candidate.ai_match_percent }}%</strong>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <div class="card border-success">
-                                <div class="card-header bg-success text-white">
-                                    <h5 class="mb-0">Сильные стороны</h5>
-                                </div>
-                                <div class="card-body">
-                                    {% if candidate.ai_pros %}
-                                    <ul class="mb-0">
-                                        {% for pro in candidate.ai_pros.split('\n') %}
-                                        <li>{{ pro }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                    {% else %}
-                                    <p class="text-muted mb-0">Нет данных</p>
-                                    {% endif %}
+                    <!-- AI-анализ -->
+                    {% if candidate.ai_match_percent is not none %}
+                    <div class="ai-analysis mt-4">
+                        <h4 class="section-heading mb-3">
+                            <i class="fas fa-robot me-2"></i>AI-анализ соответствия
+                        </h4>
+                        
+                        <!-- Общая оценка -->
+                        <div class="overall-score mb-4">
+                            <h5 class="mb-3">Общая оценка соответствия</h5>
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar {% if candidate.ai_match_percent >= 70 %}bg-success{% elif candidate.ai_match_percent >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                     role="progressbar" 
+                                     style="width: {{ candidate.ai_match_percent }}%;" 
+                                     aria-valuenow="{{ candidate.ai_match_percent }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    {{ candidate.ai_match_percent }}%
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="card border-danger">
-                                <div class="card-header bg-danger text-white">
-                                    <h5 class="mb-0">Слабые стороны</h5>
+
+                        <!-- Сильные и слабые стороны -->
+                        <div class="row mb-4">
+                            <!-- Сильные стороны -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-success text-white">
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-plus-circle me-2"></i>Сильные стороны
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if candidate.ai_pros %}
+                                            <ul class="list-group list-group-flush">
+                                                {% for pro in candidate.ai_pros %}
+                                                    <li class="list-group-item">
+                                                        <i class="fas fa-check-circle text-success me-2"></i>{{ pro }}
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="text-muted mb-0">Сильные стороны не выявлены</p>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                <div class="card-body">
-                                    {% if candidate.ai_cons %}
-                                    <ul class="mb-0">
-                                        {% for con in candidate.ai_cons.split('\n') %}
-                                        <li>{{ con }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                    {% else %}
-                                    <p class="text-muted mb-0">Нет данных</p>
-                                    {% endif %}
+                            </div>
+
+                            <!-- Слабые стороны -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-danger text-white">
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-minus-circle me-2"></i>Слабые стороны
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if candidate.ai_cons %}
+                                            <ul class="list-group list-group-flush">
+                                                {% for con in candidate.ai_cons %}
+                                                    <li class="list-group-item">
+                                                        <i class="fas fa-times-circle text-danger me-2"></i>{{ con }}
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="text-muted mb-0">Слабые стороны не выявлены</p>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h5>Рекомендация AI:</h5>
-                        <div class="p-3 border rounded">
-                            {{ candidate.ai_recommendation or 'Нет рекомендаций' }}
+
+                        <!-- Рекомендация AI -->
+                        <div class="ai-recommendation mb-4">
+                            <h5 class="mb-3">Рекомендация AI:</h5>
+                            <div class="alert {% if candidate.ai_recommendation == 'принять' %}alert-success{% elif candidate.ai_recommendation == 'отклонить' %}alert-danger{% else %}alert-warning{% endif %}">
+                                <i class="fas fa-robot me-2"></i>
+                                <strong>{{ candidate.ai_recommendation|title }}</strong>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h5>Детализация по категориям:</h5>
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Категория</th>
-                                    <th>Оценка</th>
-                                    <th>Комментарий</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Локация</td>
-                                    <td>{{ candidate.ai_score_location or 'N/A' }}/100</td>
-                                    <td>{{ candidate.ai_score_comments_location or '' }}</td>
-                                </tr>
-                                <tr>
-                                    <td>Опыт работы</td>
-                                    <td>{{ candidate.ai_score_experience or 'N/A' }}/100</td>
-                                    <td>{{ candidate.ai_score_comments_experience or '' }}</td>
-                                </tr>
-                                <tr>
-                                    <td>Технические навыки</td>
-                                    <td>{{ candidate.ai_score_tech or 'N/A' }}/100</td>
-                                    <td>{{ candidate.ai_score_comments_tech or '' }}</td>
-                                </tr>
-                                <tr>
-                                    <td>Образование</td>
-                                    <td>{{ candidate.ai_score_education or 'N/A' }}/100</td>
-                                    <td>{{ candidate.ai_score_comments_education or '' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    {% if candidate.ai_mismatch_notes %}
-                    <div class="mb-0">
-                        <h5>Примечания о несоответствии:</h5>
-                        <div class="p-3 border rounded">
-                            {{ candidate.ai_mismatch_notes }}
+
+                        <!-- Детализация по категориям -->
+                        <div class="category-scores mb-4">
+                            <h5 class="mb-3">Детализация по категориям:</h5>
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Категория</th>
+                                            <th>Оценка</th>
+                                            <th>Комментарий</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Локация</td>
+                                            <td>
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar bg-success" role="progressbar" 
+                                                         style="width: {{ candidate.ai_score_location }}%;" 
+                                                         aria-valuenow="{{ candidate.ai_score_location }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        {{ candidate.ai_score_location }}/100
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>{{ candidate.ai_score_comments_location }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Опыт работы</td>
+                                            <td>
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar {% if candidate.ai_score_experience >= 70 %}bg-success{% elif candidate.ai_score_experience >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                         role="progressbar" 
+                                                         style="width: {{ candidate.ai_score_experience }}%;" 
+                                                         aria-valuenow="{{ candidate.ai_score_experience }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        {{ candidate.ai_score_experience }}/100
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>{{ candidate.ai_score_comments_experience }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Технические навыки</td>
+                                            <td>
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar {% if candidate.ai_score_tech >= 70 %}bg-success{% elif candidate.ai_score_tech >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                         role="progressbar" 
+                                                         style="width: {{ candidate.ai_score_tech }}%;" 
+                                                         aria-valuenow="{{ candidate.ai_score_tech }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        {{ candidate.ai_score_tech }}/100
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>{{ candidate.ai_score_comments_tech }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Образование</td>
+                                            <td>
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar {% if candidate.ai_score_education >= 70 %}bg-success{% elif candidate.ai_score_education >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                         role="progressbar" 
+                                                         style="width: {{ candidate.ai_score_education }}%;" 
+                                                         aria-valuenow="{{ candidate.ai_score_education }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        {{ candidate.ai_score_education }}/100
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>{{ candidate.ai_score_comments_education }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
+
+                        <!-- Примечания о несоответствии -->
+                        {% if candidate.ai_mismatch_notes %}
+                        <div class="mismatch-notes">
+                            <h5 class="mb-3">Примечания о несоответствии:</h5>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                {{ candidate.ai_mismatch_notes }}
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                    
                     {% else %}
                     <div class="text-center">
                         <div class="alert alert-info">

@@ -26,7 +26,7 @@ def index():
     
     return render_template(
         'public/index.html',
-        title='HRAI: Найдите работу своей мечты'
+        title='Clever HR: Найдите работу своей мечты'
     )
 
 @public_bp.route('/vacancies')
@@ -199,25 +199,32 @@ def apply(vacancy_id):
                         soft_answers[question_id] = request.form.get(field_name).strip()
             
             # Обрабатываем загрузку резюме
+            resume_path = None
+            resume_text = None
             if form.resume.data:
                 resume_file = form.resume.data
                 filename = save_resume(resume_file, tracking_code)
+                current_app.logger.info(f"Сохранено резюме: {filename}")
                 
                 if filename:
                     resume_path = filename
                     
                     # Получаем расширение файла
                     file_extension = os.path.splitext(filename)[1].lower()
+                    current_app.logger.info(f"Расширение файла резюме: {file_extension}")
                     
                     # Для изображений (jpg, jpeg, png) не пытаемся извлекать текст
                     if file_extension not in ['.jpg', '.jpeg', '.png']:
                         # Извлекаем текст из резюме для других форматов
                         resume_text = extract_text_from_resume(filename)
-                        if resume_text:
-                            resume_text = resume_text
+                        current_app.logger.info(f"Извлеченный текст резюме: {resume_text[:100] if resume_text else 'None'}")
+                        if not resume_text:
+                            resume_text = "Не удалось извлечь текст из резюме"
+                            current_app.logger.warning("Не удалось извлечь текст из резюме")
                     else:
                         # Для изображений просто сохраняем информативное сообщение
                         resume_text = "Файл резюме загружен в формате изображения и доступен для просмотра."
+                        current_app.logger.info("Резюме в формате изображения")
             
             # Создаем кандидата
             candidate = Candidate(
@@ -229,18 +236,23 @@ def apply(vacancy_id):
                     "location": form.location.data,
                     "experience_years": form.experience_years.data,
                     "education": form.education.data,
-                    "desired_salary": form.desired_salary.data if form.desired_salary.data else None
+                    "desired_salary": form.desired_salary.data if form.desired_salary.data else None,
+                    "gender": request.form.get('gender')  # Добавляем пол в базовые ответы
                 },
                 vacancy_answers=vacancy_answers,
                 soft_answers=soft_answers,
                 cover_letter=form.cover_letter.data,
                 resume_path=resume_path,
-                id_c_candidate_status=0  # Статус "Новая заявка"
+                resume_text=resume_text,
+                id_c_candidate_status=0,  # Статус "Новая заявка"
+                tracking_code=tracking_code,  # Используем уже сгенерированный код
+                gender=request.form.get('gender')  # Добавляем пол в модель
             )
             
             # Сохраняем кандидата
             db.session.add(candidate)
             db.session.commit()
+            current_app.logger.info(f"Создан кандидат с ID: {candidate.id}, resume_text: {candidate.resume_text[:100] if candidate.resume_text else 'None'}")
             
             # Создаем уведомление о новой заявке
             notification = Notification(
@@ -259,11 +271,14 @@ def apply(vacancy_id):
             )
             
             # Запускаем AI-анализ в фоновом режиме, если настроено
-            if hasattr(candidate, 'resume_text') and candidate.resume_text and 'ai_analysis' in current_app.config.get('ENABLED_FEATURES', []):
+            current_app.logger.info(f"Проверка условий для AI-анализа: resume_text={bool(resume_text)}, enabled_features={current_app.config.get('ENABLED_FEATURES', [])}")
+            if resume_text and 'ai_analysis' in current_app.config.get('ENABLED_FEATURES', []):
                 try:
+                    current_app.logger.info(f"Запуск AI-анализа для кандидата {candidate.id}")
                     request_ai_analysis(candidate)
+                    current_app.logger.info("AI-анализ успешно запущен")
                 except Exception as e:
-                    current_app.logger.error(f"Ошибка при запуске AI-анализа: {str(e)}")
+                    current_app.logger.error(f"Ошибка при запуске AI-анализа: {str(e)}", exc_info=True)
             
             flash('Ваша заявка успешно отправлена! Используйте код отслеживания для проверки статуса.', 'success')
             return redirect(url_for('public_bp.application_success', tracking_code=tracking_code))
@@ -273,11 +288,6 @@ def apply(vacancy_id):
             db.session.rollback()
             current_app.logger.error(f"Ошибка при сохранении заявки: {str(e)}")
             flash('Произошла ошибка при отправке заявки. Пожалуйста, попробуйте еще раз.', 'danger')
-    
-    # Если есть ошибки валидации, выводим их
-    if form.errors:
-        # Выводим только общую ошибку, без деталей по каждому полю
-        flash('Пожалуйста, исправьте ошибки в форме и попробуйте снова.', 'danger')
     
     return render_template(
         'public/apply.html',

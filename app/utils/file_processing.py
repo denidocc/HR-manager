@@ -49,7 +49,10 @@ def save_resume(file, tracking_code):
 
 def extract_text_from_resume(file_path):
     """Извлечение текста из файла резюме"""
+    current_app.logger.info(f"Начало извлечения текста из файла: {file_path}")
+    
     if not file_path or not os.path.exists(file_path):
+        current_app.logger.error(f"Файл не существует или путь не указан: {file_path}")
         return None
     
     # Проверяем наличие расширения
@@ -57,54 +60,78 @@ def extract_text_from_resume(file_path):
     if len(parts) < 2 or not parts[1]:
         # Если расширение отсутствует или пустое, используем расширение по умолчанию
         extension = 'pdf'  # Расширение по умолчанию
+        current_app.logger.info(f"Расширение не найдено, используем по умолчанию: {extension}")
     else:
         extension = parts[1].lower()
+        current_app.logger.info(f"Определено расширение файла: {extension}")
     
     # Извлечение текста из разных форматов файлов
     if extension == 'pdf':
+        current_app.logger.info("Извлечение текста из PDF")
         return extract_text_from_pdf(file_path)
     elif extension in ['doc', 'docx']:
+        current_app.logger.info("Извлечение текста из DOC/DOCX")
         return extract_text_from_docx(file_path)
     elif extension in ['jpg', 'jpeg', 'png']:
+        current_app.logger.info("Извлечение текста из изображения")
         return extract_text_from_image(file_path)
     
+    current_app.logger.error(f"Неподдерживаемый формат файла: {extension}")
     return None
 
 def extract_text_from_pdf(file_path):
     """Извлечение текста из PDF-файла"""
     try:
         import fitz  # PyMuPDF
+        current_app.logger.info("PyMuPDF успешно импортирован")
         
         text = ""
         with fitz.open(file_path) as pdf:
-            for page in pdf:
-                text += page.get_text()
+            current_app.logger.info(f"PDF файл открыт, количество страниц: {len(pdf)}")
+            for page_num, page in enumerate(pdf, 1):
+                page_text = page.get_text()
+                text += page_text
+                current_app.logger.info(f"Извлечен текст со страницы {page_num}, длина: {len(page_text)} символов")
         
+        if not text.strip():
+            current_app.logger.warning("Извлеченный текст пуст")
+            return None
+            
+        current_app.logger.info(f"Успешно извлечен текст из PDF, общая длина: {len(text)} символов")
         return text
     except ImportError:
         current_app.logger.error("PyMuPDF (fitz) не установлен. Установите: pip install pymupdf")
         return "Извлечение текста из PDF недоступно. Установите необходимые библиотеки."
     except Exception as e:
-        current_app.logger.error(f"Ошибка при извлечении текста из PDF: {str(e)}")
+        current_app.logger.error(f"Ошибка при извлечении текста из PDF: {str(e)}", exc_info=True)
         return None
 
 def extract_text_from_docx(file_path):
     """Извлечение текста из DOCX/DOC файла"""
     try:
         import docx
+        current_app.logger.info("python-docx успешно импортирован")
         
         if file_path.endswith('.docx'):
             doc = docx.Document(file_path)
+            current_app.logger.info(f"DOCX файл открыт, количество параграфов: {len(doc.paragraphs)}")
+            
             text = "\n".join([para.text for para in doc.paragraphs])
+            
+            if not text.strip():
+                current_app.logger.warning("Извлеченный текст пуст")
+                return None
+                
+            current_app.logger.info(f"Успешно извлечен текст из DOCX, длина: {len(text)} символов")
             return text
         else:
-            # Для DOC-файлов может потребоваться дополнительная обработка
+            current_app.logger.warning("Извлечение текста из DOC-файлов в данный момент не поддерживается")
             return "Извлечение текста из DOC-файлов в данный момент не поддерживается"
     except ImportError:
         current_app.logger.error("python-docx не установлен. Установите: pip install python-docx")
         return "Извлечение текста из DOCX недоступно. Установите необходимые библиотеки."
     except Exception as e:
-        current_app.logger.error(f"Ошибка при извлечении текста из DOCX: {str(e)}")
+        current_app.logger.error(f"Ошибка при извлечении текста из DOCX: {str(e)}", exc_info=True)
         return None
 
 def extract_text_from_image(file_path):

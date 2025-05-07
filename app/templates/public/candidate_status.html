@@ -28,7 +28,7 @@
                         <h4 class="section-heading">Этапы рассмотрения</h4>
                         
                         <ul class="timeline">
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status == 0 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 0 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Заявка подана</h5>
@@ -38,7 +38,7 @@
                                     {% endif %}
                                 </div>
                             </li>
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status == 1 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 1 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Рассмотрение резюме</h5>
@@ -48,7 +48,7 @@
                                     {% endif %}
                                 </div>
                             </li>
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status == 2 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 2 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Интервью</h5>
@@ -58,21 +58,21 @@
                                     {% endif %}
                                 </div>
                             </li>
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status == 5 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 5 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Ожидание решения</h5>
                                     <p>Ожидание решения после интервью</p>
                                 </div>
                             </li>
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status == 4 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 4 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Принят</h5>
                                     <p>Вы приняты на работу</p>
                                 </div>
                             </li>
-                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status == 3 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.id_c_candidate_status >= 3 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Отклонен</h5>
@@ -111,7 +111,7 @@
                         <p>Если у вас есть вопросы по вашей заявке, пожалуйста, свяжитесь с нами:</p>
                         <ul class="list-unstyled">
                             <li><i class="fas fa-envelope me-2"></i>Email: <a href="mailto:hr@company.com">hr@company.com</a></li>
-                            <li><i class="fas fa-phone me-2"></i>Телефон: +7 (XXX) XXX-XX-XX</li>
+                            <li><i class="fas fa-phone me-2"></i>Телефон: +993 XX XX-XX-XX</li>
                         </ul>
                         <p class="mb-0"><small>При обращении, пожалуйста, укажите ваш код отслеживания: <strong>{{ candidate.tracking_code }}</strong></small></p>
                     </div>

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from faker import Faker
 from app import create_app, db
 from app.models import User, Vacancy, Candidate, Notification, SystemLog
-from app.models import C_Gender, C_User_Status, C_Candidate_Status, C_Employment_Type
+from app.models import C_Gender, C_User_Status, C_Candidate_Status, C_Employment_Type, C_Education
 from tqdm import tqdm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -37,6 +37,23 @@ def create_c_gender():
         create_if_not_exists(C_Gender, gender['name'], i, short_name=gender['short_name'])
     db.session.commit()
     print("Справочник полов успешно создан")
+
+def create_c_education():
+    """Создание справочника образований"""
+    educations = [
+        {'name': 'Не указан', 'short_name': 'Н/У'},
+        {'name': 'Среднее', 'short_name': 'Ср'},
+        {'name': 'Среднее специальное', 'short_name': 'СП'},
+        {'name': 'Высшее', 'short_name': 'Высш'},
+        {'name': 'Магистратура', 'short_name': 'Маг'},
+        {'name': 'Аспирантура', 'short_name': 'Аспир'},
+        {'name': 'Ученая степень', 'short_name': 'Ученая степень'},
+        {'name': 'Другое', 'short_name': 'Другое'}
+    ]
+    for i, education in enumerate(educations):
+        create_if_not_exists(C_Education, education['name'], i, short_name=education['short_name'])
+    db.session.commit()
+    print("Справочник образований успешно создан")
 
 def create_c_user_status():
     """Создание справочника статусов пользователей"""
@@ -472,7 +489,7 @@ def main():
     create_c_user_status()
     create_c_candidate_status()
     create_c_employment_type()
-    
+    create_c_education()
     # Создание пользователей
     create_admin_user()
     create_hr_users(5)

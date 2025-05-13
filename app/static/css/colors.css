@@ -1,26 +1,32 @@
+@import url('https://fonts.cdnfonts.com/css/avenir');
+
 :root {
+    /* Шрифты */
+    --font-primary: 'Avenir', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    
     /* Основная цветовая палитра */
-    --primary-color: #1A1B41;      /* Основной цвет */
-    --accent-color: #BAFF29;       /* Акцентный цвет */
-    --secondary-color: #6290C3;    /* Второстепенный цвет */
-    --light-color: #F1FFE7;        /* Светлый цвет */
-    --additional-color: #C2E7DA;   /* Дополнительный цвет */
+    --primary-color: #329774;      /* Deep Teal Green - основной цвет */
+    --accent-color: #D5694D;       /* Warm Terracotta - акцентный цвет */
+    --secondary-color: #2F4858;    /* Muted Navy Blue - второстепенный цвет */
+    --light-color: #F3F3F3;        /* Soft White/Light Gray - светлый цвет */
+    --additional-color: #E7AF8F;   /* Muted Coral - дополнительный цвет */
+    --complementary-color: #C4A35A; /* Deep Mustard - комплементарный цвет */
     
     /* Функциональные цвета */
-    --text-primary: var(--primary-color);
-    --text-secondary: var(--secondary-color);
-    --text-light: var(--light-color);
-    --background-main: var(--light-color);
-    --background-accent: var(--additional-color);
-    --button-primary-bg: var(--primary-color);
-    --button-primary-text: var(--light-color);
-    --button-accent-bg: var(--accent-color);
-    --button-accent-text: var(--primary-color);
-    --footer-text: var(--secondary-color);
+    --text-primary: var(--secondary-color);    /* Используем Navy Blue для основного текста */
+    --text-secondary: var(--primary-color);    /* Teal Green для второстепенного текста */
+    --text-light: var(--light-color);          /* Light Gray для светлого текста */
+    --background-main: var(--light-color);     /* Light Gray для основного фона */
+    --background-accent: var(--additional-color); /* Muted Coral для акцентного фона */
+    --button-primary-bg: var(--primary-color); /* Teal Green для основных кнопок */
+    --button-primary-text: var(--light-color); /* Light Gray для текста на основных кнопках */
+    --button-accent-bg: var(--accent-color);   /* Terracotta для акцентных кнопок */
+    --button-accent-text: var(--light-color);  /* Light Gray для текста на акцентных кнопках */
+    --footer-text: var(--secondary-color);     /* Navy Blue для текста в футере */
     
     /* Прозрачные версии для эффектов */
-    --primary-color-90: rgba(26, 27, 65, 0.9);
-    --accent-color-90: rgba(186, 255, 41, 0.9);
-    --primary-color-shadow: rgba(26, 27, 65, 0.2);
-    --accent-color-shadow: rgba(186, 255, 41, 0.2);
+    --primary-color-90: rgba(50, 151, 116, 0.9);    /* Teal Green с прозрачностью */
+    --accent-color-90: rgba(213, 105, 77, 0.9);     /* Terracotta с прозрачностью */
+    --primary-color-shadow: rgba(50, 151, 116, 0.2); /* Тень Teal Green */
+    --accent-color-shadow: rgba(213, 105, 77, 0.2);  /* Тень Terracotta */
 } 

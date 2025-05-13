@@ -7,10 +7,11 @@ from app import db
 from app.models import Candidate, Vacancy, SystemLog
 from app.utils.ai_service import request_ai_analysis, get_analysis_status
 import json
-
+from app.utils.decorators import profile_time
 ai_analysis_bp = Blueprint('ai_analysis', __name__, url_prefix='/ai_analysis')
 
 @ai_analysis_bp.route('/start/<int:candidate_id>', methods=['POST'])
+@profile_time
 @login_required
 def start_analysis(candidate_id):
     """Запуск AI-анализа для кандидата"""
@@ -58,6 +59,7 @@ def start_analysis(candidate_id):
         }), 500
 
 @ai_analysis_bp.route('/status/<job_id>')
+@profile_time
 @login_required
 def check_status(job_id):
     """Проверка статуса AI-анализа по ID задачи"""
@@ -78,6 +80,7 @@ def check_status(job_id):
         }), 500
 
 @ai_analysis_bp.route('/result/<int:candidate_id>')
+@profile_time
 @login_required
 def view_result(candidate_id):
     """Просмотр результатов AI-анализа"""
@@ -133,6 +136,7 @@ def view_result(candidate_id):
     )
 
 @ai_analysis_bp.route('/api/result/<int:candidate_id>')
+@profile_time
 @login_required
 def api_result(candidate_id):
     """API для получения результатов AI-анализа в формате JSON"""
@@ -174,6 +178,7 @@ def api_result(candidate_id):
     })
 
 @ai_analysis_bp.route('/explanation')
+@profile_time
 @login_required
 def explanation():
     """Страница с объяснением методологии AI-анализа"""

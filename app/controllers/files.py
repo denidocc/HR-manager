@@ -7,10 +7,12 @@ from app.models import SystemLog
 from werkzeug.utils import secure_filename
 import os
 import uuid
+from app.utils.decorators import profile_time
 
 files_bp = Blueprint('files', __name__, url_prefix='/files')
 
 @files_bp.route('/upload', methods=['POST'])
+@profile_time
 def upload_file():
     """API для загрузки файлов"""
     # Проверяем, есть ли файл в запросе
@@ -66,6 +68,7 @@ def upload_file():
     }), 200
 
 @files_bp.route('/<filename>')
+@profile_time
 def download_file(filename):
     """Загрузка файла"""
     # Для безопасности проверяем, что filename не содержит путей
@@ -90,6 +93,7 @@ def download_file(filename):
     return send_from_directory(upload_folder, filename, as_attachment=True)
 
 @files_bp.route('/view/<filename>')
+@profile_time
 def view_file(filename):
     """Просмотр файла (без скачивания)"""
     # Для безопасности проверяем, что filename не содержит путей
@@ -114,6 +118,7 @@ def view_file(filename):
     return send_from_directory(upload_folder, filename, as_attachment=False)
 
 @files_bp.route('/delete/<filename>', methods=['POST'])
+@profile_time
 @login_required
 def delete_file(filename):
     """Удаление файла"""
@@ -142,6 +147,7 @@ def delete_file(filename):
     return jsonify({'status': 'success', 'message': 'Файл успешно удален'}), 200
 
 @files_bp.route('/download_resume/<filename>')
+@profile_time
 def download_resume(filename):
     """Скачивание файла резюме (для обратной совместимости)"""
     return download_file(filename) 

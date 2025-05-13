@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 from app import db
+from app.models.c_employment_type import C_Employment_Type
 
 class Vacancy(db.Model):
     __tablename__ = 'vacancies'
@@ -24,6 +25,7 @@ class Vacancy(db.Model):
     updated_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     closed_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), nullable=True)  # дата закрытия вакансии
     created_by: so.Mapped[int] = so.mapped_column(sa.Integer, sa.ForeignKey('users.id'), nullable=True)
+    company_values: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     
     # Отношения
     creator = so.relationship('User', back_populates='created_vacancies')

@@ -13,10 +13,12 @@ from flask import current_app
 import pandas as pd
 import re
 from collections import Counter
+from app.utils.decorators import profile_time
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 @dashboard_bp.route('/')
+@profile_time
 @login_required
 @admin_required
 def index():
@@ -81,6 +83,7 @@ def index():
     )
 
 @dashboard_bp.route('/statistics')
+@profile_time
 @login_required
 @admin_required
 def statistics():
@@ -130,6 +133,7 @@ def statistics():
     )
 
 @dashboard_bp.route('/api/chart_data')
+@profile_time
 @login_required
 @admin_required
 def api_chart_data():
@@ -181,6 +185,7 @@ def api_chart_data():
     })
 
 @dashboard_bp.route('/users')
+@profile_time
 @login_required
 @admin_required
 def users():
@@ -276,6 +281,7 @@ def users():
     )
 
 @dashboard_bp.route('/approve-user/<int:user_id>', methods=['POST'])
+@profile_time
 @login_required
 @admin_required
 def approve_user(user_id):
@@ -305,6 +311,7 @@ def approve_user(user_id):
     return redirect(url_for('dashboard.users'))
 
 @dashboard_bp.route('/reject-user/<int:user_id>', methods=['POST'])
+@profile_time
 @login_required
 @admin_required
 def reject_user(user_id):
@@ -334,7 +341,9 @@ def reject_user(user_id):
     return redirect(url_for('dashboard.users'))
 
 @dashboard_bp.route('/hr')
+@profile_time
 @login_required
+@admin_required
 def hr_dashboard():
     """Главная страница дашборда для HR-менеджеров"""
     # Статистика по системе (упрощенная для HR)
@@ -375,7 +384,9 @@ def hr_dashboard():
     )
 
 @dashboard_bp.route('/statistics/recruitment_funnel')
+@profile_time
 @login_required
+@admin_required
 def recruitment_funnel():
     """Страница с воронкой найма"""
     # Получаем данные по этапам воронки для каждой вакансии
@@ -428,7 +439,9 @@ def recruitment_funnel():
     )
 
 @dashboard_bp.route('/statistics/time_to_fill')
+@profile_time
 @login_required
+@admin_required
 def time_to_fill():
     """Страница с анализом времени закрытия вакансий"""
     # Получаем данные о времени закрытия вакансий
@@ -476,7 +489,9 @@ def time_to_fill():
     )
 
 @dashboard_bp.route('/skills_analysis')
+@profile_time
 @login_required
+@admin_required
 def skills_analysis():
     """Анализ навыков кандидатов по всем отраслям на основе моделей в базе данных"""
     try:
@@ -620,7 +635,9 @@ def skills_analysis():
         return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/source_analysis')
+@profile_time
 @login_required
+@admin_required
 def source_analysis():
     """Страница с анализом источников кандидатов"""
     try:
@@ -682,7 +699,9 @@ def source_analysis():
         return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/qualification_analysis')
+@profile_time
 @login_required
+@admin_required
 def qualification_analysis():
     """Страница с анализом квалификации кандидатов на основе данных из базы"""
     try:
@@ -922,7 +941,9 @@ def qualification_analysis():
         return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/rejection_analysis')
+@profile_time
 @login_required
+@admin_required
 def rejection_analysis():
     """Страница с анализом отказов"""
     try:
@@ -990,7 +1011,9 @@ def rejection_analysis():
         return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/predictive_analytics')
+@profile_time
 @login_required
+@admin_required
 def predictive_analytics():
     """Страница с прогнозной аналитикой"""
     try:
@@ -1076,7 +1099,9 @@ def predictive_analytics():
         return redirect(url_for('dashboard.statistics'))
 
 @dashboard_bp.route('/statistics/seasonal_trends')
+@profile_time
 @login_required
+@admin_required
 def seasonal_trends():
     """Страница с анализом сезонных трендов"""
     try:

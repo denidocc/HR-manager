@@ -12,6 +12,7 @@ from app.utils.email_service import send_password_reset_email
 from functools import wraps
 from sqlalchemy import func, cast
 import sqlalchemy as sa
+from app.utils.decorators import profile_time
 
 auth_bp = Blueprint('auth_bp', __name__, url_prefix='/auth')
 
@@ -26,6 +27,7 @@ def admin_required(f):
     return decorated_function
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@profile_time
 def login():
     """Страница авторизации для HR-менеджеров"""
     if current_user.is_authenticated:
@@ -81,6 +83,7 @@ def login():
     return render_template('auth/login.html', form=form, title='Вход в систему')
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@profile_time
 @login_required
 @admin_required
 def register():
@@ -115,6 +118,7 @@ def register():
     return render_template('auth/register.html', form=form, title='Регистрация пользователя')
 
 @auth_bp.route('/register-hr', methods=['GET', 'POST'])
+@profile_time
 def register_hr():
     """Публичная регистрация нового HR-менеджера"""
     if current_user.is_authenticated:
@@ -165,6 +169,7 @@ def register_hr():
     return render_template('auth/register_hr.html', form=form, title='Регистрация HR-менеджера')
 
 @auth_bp.route('/logout')
+@profile_time
 @login_required
 def logout():
     """Выход из системы"""
@@ -180,6 +185,7 @@ def logout():
     return redirect(url_for('auth_bp.login'))
 
 @auth_bp.route('/reset_password_request', methods=['GET', 'POST'])
+@profile_time
 def reset_password_request():
     """Запрос на сброс пароля"""
     if current_user.is_authenticated:
@@ -216,6 +222,7 @@ def reset_password_request():
     return render_template('auth/reset_password_request.html', form=form, title='Сброс пароля')
 
 @auth_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
+@profile_time
 def reset_password(token):
     """Сброс пароля по токену"""
     if current_user.is_authenticated:

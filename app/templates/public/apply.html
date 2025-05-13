@@ -158,7 +158,7 @@
                                         {% if question.required %}<span class="text-danger">*</span>{% endif %}
                                     </label>
                                     {% if field_name in form._fields %}
-                                        {{ form[field_name](class="form-control" + (" is-invalid" if form[field_name].errors else ""), rows=3, id=field_name) }}
+                                        {{ form[field_name](class="form-control" + (" is-invalid" if form[field_name].errors else ""), rows=3, id=field_name, value=request.form.get(field_name, '')) }}
                                         {% if form[field_name].errors %}
                                             <div class="invalid-feedback">
                                                 {% for error in form[field_name].errors %}
@@ -168,7 +168,7 @@
                                         {% endif %}
                                     {% else %}
                                         <textarea class="form-control" id="{{ field_name }}" name="{{ field_name }}" rows="3" 
-                                                  {% if question.required %}required{% endif %}></textarea>
+                                                  {% if question.required %}required{% endif %}>{{ request.form.get(field_name, '') }}</textarea>
                                     {% endif %}
                                     {% if question.help_text %}
                                         <div class="form-text">{{ question.help_text }}</div>
@@ -191,7 +191,7 @@
                                         {% if question.required %}<span class="text-danger">*</span>{% endif %}
                                     </label>
                                     {% if field_name in form._fields %}
-                                        {{ form[field_name](class="form-control" + (" is-invalid" if form[field_name].errors else ""), rows=3, id=field_name) }}
+                                        {{ form[field_name](class="form-control" + (" is-invalid" if form[field_name].errors else ""), rows=3, id=field_name, value=request.form.get(field_name, '')) }}
                                         {% if form[field_name].errors %}
                                             <div class="invalid-feedback">
                                                 {% for error in form[field_name].errors %}
@@ -201,7 +201,7 @@
                                         {% endif %}
                                     {% else %}
                                         <textarea class="form-control" id="{{ field_name }}" name="{{ field_name }}" rows="3" 
-                                                  {% if question.required %}required{% endif %}></textarea>
+                                                  {% if question.required %}required{% endif %}>{{ request.form.get(field_name, '') }}</textarea>
                                     {% endif %}
                                     {% if question.help_text %}
                                         <div class="form-text">{{ question.help_text }}</div>

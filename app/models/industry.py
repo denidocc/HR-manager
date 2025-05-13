@@ -15,6 +15,7 @@ class Industry(db.Model):
     # Отношения
     parent = so.relationship('Industry', remote_side=[id], backref='children')
     vacancies = so.relationship('VacancyIndustry', back_populates='industry')
+    keywords = so.relationship('Keyword', back_populates='industry')
     
     def __repr__(self):
         return f'<Industry {self.name}>' 

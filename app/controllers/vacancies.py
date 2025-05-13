@@ -9,6 +9,7 @@ from app.forms.vacancy import VacancyForm
 import json
 import logging
 import traceback
+from app.utils.decorators import profile_time
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 vacancies_bp = Blueprint('vacancies', __name__, url_prefix='/vacancies')
 
 @vacancies_bp.route('/')
+@profile_time
 @login_required
 def index():
     """Список всех вакансий"""
@@ -49,6 +51,7 @@ def index():
     )
 
 @vacancies_bp.route('/create', methods=['GET', 'POST'])
+@profile_time
 @login_required
 def create():
     """Создание новой вакансии"""
@@ -156,6 +159,7 @@ def create():
     return render_template('vacancies/create.html', form=form, title='Создание вакансии')
 
 @vacancies_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@profile_time
 @login_required
 def edit(id):
     """Редактирование вакансии"""
@@ -312,6 +316,7 @@ def edit(id):
     return render_template('vacancies/edit.html', form=form, vacancy=vacancy, title='Редактирование вакансии')
 
 @vacancies_bp.route('/<int:id>/toggle_status', methods=['POST'])
+@profile_time
 @login_required
 def toggle_status(id):
     """Изменение статуса активности вакансии"""
@@ -335,6 +340,7 @@ def toggle_status(id):
     return redirect(url_for('vacancies.index'))
 
 @vacancies_bp.route('/<int:id>/view')
+@profile_time
 @login_required
 def view(id):
     """Просмотр детальной информации о вакансии"""
@@ -360,6 +366,7 @@ def view(id):
     )
 
 @vacancies_bp.route('/<int:id>/candidates')
+@profile_time
 @login_required
 def candidates(id):
     """Список кандидатов по конкретной вакансии"""
@@ -399,6 +406,7 @@ def candidates(id):
     )
 
 @vacancies_bp.route('/<int:id>/archive', methods=['POST'])
+@profile_time
 @login_required
 def archive(id):
     """Архивация или восстановление вакансии"""

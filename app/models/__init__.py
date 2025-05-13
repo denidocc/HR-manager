@@ -14,4 +14,6 @@ from app.models.skill import Skill
 from app.models.vacancy_skill import VacancySkill
 from app.models.candidate_skill import CandidateSkill
 from app.models.industry import Industry
-from app.models.vacancy_industry import VacancyIndustry 
+from app.models.vacancy_industry import VacancyIndustry
+from app.models.keyword import Keyword
+from app.models.keyword_category import KeywordCategory 

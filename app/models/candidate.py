@@ -18,6 +18,7 @@ class Candidate(db.Model):
     soft_answers: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: {})
     resume_path: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     resume_text: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
+    resume_data: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: {}, nullable=True)
     cover_letter: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     ai_match_percent: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=True)
     ai_pros: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)

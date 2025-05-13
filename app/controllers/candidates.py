@@ -8,6 +8,7 @@ from app.models import Candidate, Vacancy, C_Candidate_Status, SystemLog, Notifi
 from app.forms.candidate import CandidateCommentForm, CandidateStatusForm
 from app.utils.ai_service import request_ai_analysis
 from app.utils.email_service import send_status_change_notification
+from app.utils.decorators import profile_time
 import os
 from werkzeug.utils import secure_filename
 import datetime
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 candidates_bp = Blueprint('candidates', __name__, url_prefix='/candidates')
 
 @candidates_bp.route('/')
+@profile_time
 @login_required
 def index():
     """Список всех кандидатов HR-менеджера"""
@@ -119,6 +121,7 @@ def index():
     )
 
 @candidates_bp.route('/<int:id>')
+@profile_time
 @login_required
 def view(id):
     """Детальная информация о кандидате"""
@@ -261,6 +264,7 @@ def view(id):
     )
 
 @candidates_bp.route('/<int:id>/change_status', methods=['POST'])
+@profile_time
 @login_required
 def change_status(id):
     """Изменение статуса кандидата"""
@@ -337,6 +341,7 @@ def change_status(id):
     return redirect(url_for('candidates.view', id=id))
 
 @candidates_bp.route('/<int:id>/add_comment', methods=['POST'])
+@profile_time
 @login_required
 def add_comment(id):
     """Добавление комментария к кандидату"""
@@ -370,6 +375,7 @@ def add_comment(id):
     return redirect(url_for('candidates.view', id=id))
 
 @candidates_bp.route('/<int:id>/download_resume')
+@profile_time
 @login_required
 def download_resume(id):
     """Скачивание резюме кандидата"""
@@ -405,6 +411,7 @@ def download_resume(id):
     )
 
 @candidates_bp.route('/<int:id>/start_analysis', methods=['POST'])
+@profile_time
 @login_required
 def start_analysis(id):
     """Запуск AI-анализа кандидата"""
@@ -523,6 +530,7 @@ def start_analysis(id):
     return redirect(url_for('candidates.view', id=candidate.id))
 
 @candidates_bp.route('/track/<tracking_code>')
+@profile_time
 def track(tracking_code):
     """Публичная страница для отслеживания статуса кандидата"""
     # Получаем данные кандидата с дешифровкой по tracking_code
@@ -589,6 +597,7 @@ def track(tracking_code):
     )
 
 @candidates_bp.route('/api/candidates')
+@profile_time
 @login_required
 def api_candidates():
     """API для получения списка кандидатов (для AJAX-запросов)"""

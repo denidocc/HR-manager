@@ -3,9 +3,9 @@
 
 from flask import Blueprint, render_template, jsonify, redirect, url_for, flash, request
 from flask_login import login_required, current_user
-from app import db
+from app import db, cache
 from app.models import Vacancy, Candidate, C_Candidate_Status, Notification, SystemLog, User, C_User_Status, Skill, SkillCategory, CandidateSkill, VacancySkill, Industry, VacancyIndustry
-from app.controllers.auth import admin_required
+from app.controllers.auth import admin_required, hr_required
 from sqlalchemy import func, desc, and_, cast, case
 import datetime
 import sqlalchemy as sa
@@ -343,33 +343,34 @@ def reject_user(user_id):
 @dashboard_bp.route('/hr')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def hr_dashboard():
     """Главная страница дашборда для HR-менеджеров"""
-    # Статистика по системе (упрощенная для HR)
-    
     # Получаем только вакансии текущего HR-менеджера
-    my_vacancies = Vacancy.query.filter_by(created_by=current_user.id).all()
-    my_vacancy_ids = [vacancy.id for vacancy in my_vacancies]
+    my_vacancy_ids = db.session.query(Vacancy.id).filter_by(created_by=current_user.id).all()
+    my_vacancy_ids = [v[0] for v in my_vacancy_ids]
     
-    # Общее количество вакансий HR-менеджера
-    total_my_vacancies_count = len(my_vacancies)
+    # Оптимизированные запросы с использованием подзапросов
+    active_vacancies_count = db.session.query(func.count(Vacancy.id))\
+        .filter(Vacancy.is_active == True, Vacancy.created_by == current_user.id)\
+        .scalar()
     
-    # Статистика активных вакансий HR-менеджера
-    active_vacancies_count = Vacancy.query.filter_by(is_active=True, created_by=current_user.id).count()
+    total_candidates_count = db.session.query(func.count(Candidate.id))\
+        .filter(Candidate.vacancy_id.in_(my_vacancy_ids))\
+        .scalar() if my_vacancy_ids else 0
     
-    # Общее количество кандидатов на вакансии HR-менеджера
-    total_candidates_count = Candidate.query.filter(Candidate.vacancy_id.in_(my_vacancy_ids)).count() if my_vacancy_ids else 0
+    # Последние кандидаты с оптимизированным запросом
+    recent_candidates = db.session.query(Candidate)\
+        .filter(Candidate.vacancy_id.in_(my_vacancy_ids))\
+        .order_by(Candidate.created_at.desc())\
+        .limit(5).all() if my_vacancy_ids else []
     
-    # Последние кандидаты только на вакансии текущего HR-менеджера
-    recent_candidates = Candidate.query.filter(Candidate.vacancy_id.in_(my_vacancy_ids)).order_by(Candidate.created_at.desc()).limit(5).all() if my_vacancy_ids else []
-    
-    # Вакансии HR-менеджера с наибольшим количеством кандидатов
+    # Топ вакансий с оптимизированным запросом
     top_vacancies = db.session.query(
         Vacancy.id, Vacancy.title, func.count(Candidate.id).label('candidates_count')
     ).join(Candidate, Vacancy.id == Candidate.vacancy_id)\
      .filter(Vacancy.created_by == current_user.id)\
-     .group_by(Vacancy.id)\
+     .group_by(Vacancy.id, Vacancy.title)\
      .order_by(desc('candidates_count'))\
      .limit(5).all()
     
@@ -379,14 +380,14 @@ def hr_dashboard():
         total_candidates_count=total_candidates_count,
         recent_candidates=recent_candidates,
         top_vacancies=top_vacancies,
-        total_my_vacancies_count=total_my_vacancies_count,
+        total_my_vacancies_count=len(my_vacancy_ids),
         title='HR Панель управления'
     )
 
 @dashboard_bp.route('/statistics/recruitment_funnel')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def recruitment_funnel():
     """Страница с воронкой найма"""
     # Получаем данные по этапам воронки для каждой вакансии
@@ -441,7 +442,7 @@ def recruitment_funnel():
 @dashboard_bp.route('/statistics/time_to_fill')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def time_to_fill():
     """Страница с анализом времени закрытия вакансий"""
     # Получаем данные о времени закрытия вакансий
@@ -491,7 +492,7 @@ def time_to_fill():
 @dashboard_bp.route('/skills_analysis')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def skills_analysis():
     """Анализ навыков кандидатов по всем отраслям на основе моделей в базе данных"""
     try:
@@ -637,7 +638,7 @@ def skills_analysis():
 @dashboard_bp.route('/statistics/source_analysis')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def source_analysis():
     """Страница с анализом источников кандидатов"""
     try:
@@ -701,7 +702,7 @@ def source_analysis():
 @dashboard_bp.route('/statistics/qualification_analysis')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def qualification_analysis():
     """Страница с анализом квалификации кандидатов на основе данных из базы"""
     try:
@@ -943,7 +944,7 @@ def qualification_analysis():
 @dashboard_bp.route('/statistics/rejection_analysis')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def rejection_analysis():
     """Страница с анализом отказов"""
     try:
@@ -1013,7 +1014,7 @@ def rejection_analysis():
 @dashboard_bp.route('/statistics/predictive_analytics')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def predictive_analytics():
     """Страница с прогнозной аналитикой"""
     try:
@@ -1101,7 +1102,7 @@ def predictive_analytics():
 @dashboard_bp.route('/statistics/seasonal_trends')
 @profile_time
 @login_required
-@admin_required
+@hr_required
 def seasonal_trends():
     """Страница с анализом сезонных трендов"""
     try:

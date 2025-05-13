@@ -10,6 +10,9 @@ from flask_mail import Mail
 from flask_argon2 import Argon2
 from flask_wtf.csrf import CSRFProtect
 from config import config
+from logging.handlers import RotatingFileHandler
+from flask_caching import Cache
+import logging.config
 
 # Инициализация расширений
 db = SQLAlchemy()
@@ -19,6 +22,7 @@ jwt = JWTManager()
 mail = Mail()
 argon2 = Argon2()
 csrf = CSRFProtect()
+cache = Cache()
 
 def create_app(config_name='default'):
     app = Flask(__name__)
@@ -32,19 +36,10 @@ def create_app(config_name='default'):
     mail.init_app(app)
     argon2.init_app(app)
     csrf.init_app(app)
+    cache.init_app(app)
     
     # Настройка логирования
-    if not app.debug:
-        if not os.path.exists('logs'):
-            os.mkdir('logs')
-        file_handler = logging.FileHandler('logs/hr_manager.log')
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
-        app.logger.setLevel(logging.INFO)
-        app.logger.info('HR Manager startup')
+    logging.config.dictConfig(app.config['LOGGING_CONFIG'])
     
     # Создание директории для загрузки файлов, если её нет
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -56,7 +51,7 @@ def create_app(config_name='default'):
     
     # Настройка login_manager
     login_manager.login_view = 'auth_bp.login'
-    login_manager.login_message = 'Пожалуйста, войдите в систему для доступа к этой странице.'
+    login_manager.login_message = 'Пожалуйста, войдите для доступа к этой странице.'
     
     @login_manager.user_loader
     def load_user(user_id):
@@ -95,5 +90,9 @@ def setup_logging(app):
     # Отключаем логи от SQLAlchemy ниже WARNING
     sa_logger = logging.getLogger('sqlalchemy')
     sa_logger.setLevel(logging.WARNING)
+    
+    # Отключаем логи от PostgreSQL
+    logging.getLogger('psycopg2').setLevel(logging.WARNING)
+    logging.getLogger('psycopg2.pool').setLevel(logging.WARNING)
     
     return app

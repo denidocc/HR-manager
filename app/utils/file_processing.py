@@ -64,17 +64,17 @@ def extract_text_from_resume(file_path):
         if not extracted_data:
             current_app.logger.error(f"Не удалось извлечь данные из файла: {file_path}")
             return None
-        
+            
         # Возвращаем только raw_text для совместимости со старым кодом,
         # при этом сохраняем структурированные данные в отдельном поле
         result = {
             "text": extracted_data.get("raw_text", ""),
             "structured_data": extracted_data,
         }
-        
+                
         current_app.logger.info(f"Успешно извлечены данные из файла: {file_path}")
         return result
         
     except Exception as e:
         current_app.logger.error(f"Ошибка при извлечении данных из файла: {str(e)}", exc_info=True)
-        return None 
+        return None

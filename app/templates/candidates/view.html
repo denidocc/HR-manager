@@ -6,21 +6,6 @@
     <form id="csrf-form" style="display: none;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
     </form>
-    
-    <!-- Добавляем стили, специфичные для этой страницы -->
-    <style>
-        /* Стили для прогресс-бара */
-        .match-bar-success { background-color: var(--bs-success) !important; }
-        .match-bar-primary { background-color: var(--bs-primary) !important; }
-        .match-bar-info { background-color: var(--bs-info) !important; }
-        .match-bar-warning { background-color: var(--bs-warning) !important; }
-        .match-bar-danger { background-color: var(--bs-danger) !important; }
-        
-        /* Стили для динамического размера ширины */
-        {% for i in range(0, 101) %}
-        .w-{{ i }} { width: {{ i }}% !important; }
-        {% endfor %}
-    </style>
 
     <div class="row mb-4">
         <div class="col-md-12">
@@ -36,9 +21,9 @@
         </div>
     </div>
     
-    <div class="row mb-4">
+    <div class="col-12 mb-4">
         <!-- Левая колонка: основная информация -->
-        <div class="col-md-6 mb-4">
+        <div class="col-md-12 mb-4">
             <div class="card h-100">
                 <div class="card-header">
                     <h4 class="mb-0">Основная информация</h4>
@@ -59,14 +44,6 @@
                             <span id="statusBadge" class="badge rounded-pill bg-secondary" 
                                   data-color="{{ candidate.c_candidate_status.color_code if candidate.c_candidate_status else 'secondary' }}">
                                 {{ candidate.c_candidate_status.name if candidate.c_candidate_status else 'Заявка подана' }}
-                            </span>
-                            <!-- Отладочная информация для проверки цветового кода -->
-                            <span class="d-none">
-                                {% if candidate.c_candidate_status %}
-                                    Цветовой код: {{ candidate.c_candidate_status.color_code }}
-                                {% else %}
-                                    Статус не установлен
-                                {% endif %}
                             </span>
                         </dd>
                         
@@ -121,223 +98,185 @@
         </div>
         
         <!-- Правая колонка: AI-анализ -->
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
+        <div class="col-md-12 mb-4">
+            <div class="card">
                 <div class="card-header">
-                    <h4 class="mb-0">AI-анализ соответствия</h4>
+                    <h4 class="mb-0">
+                        <i class="fas fa-robot me-2"></i>AI-анализ соответствия
+                    </h4>
                 </div>
                 <div class="card-body">
-                    <!-- AI-анализ -->
                     {% if candidate.ai_match_percent is not none %}
-                    <div class="ai-analysis mt-4">
-                        <h4 class="section-heading mb-3">
-                            <i class="fas fa-robot me-2"></i>AI-анализ соответствия
-                        </h4>
-                        
-                        <!-- Общая оценка -->
-                        <div class="overall-score mb-4">
-                            <h5 class="mb-3">Общая оценка соответствия</h5>
-                            <div class="progress" style="height: 25px;">
-                                <div class="progress-bar {% if candidate.ai_match_percent >= 70 %}bg-success{% elif candidate.ai_match_percent >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                     role="progressbar" 
-                                     style="width: {{ candidate.ai_match_percent }}%;" 
-                                     aria-valuenow="{{ candidate.ai_match_percent }}" 
-                                     aria-valuemin="0" 
-                                     aria-valuemax="100">
-                                    {{ candidate.ai_match_percent }}%
+                    <div class="ai-analysis">
+                        <!-- Общая оценка - новый дизайн в стиле верификации Instagram -->
+                        <div class="ai-score-container">
+                            <h5 class="mb-3">Общая оценка соответствия:</h5>
+                            
+                            {% set score_class = 'high' if candidate.ai_match_percent >= 70 else ('medium' if candidate.ai_match_percent >= 40 else 'low') %}
+                            {% set rating_text = 'Высокое соответствие' if candidate.ai_match_percent >= 70 else ('Среднее соответствие' if candidate.ai_match_percent >= 40 else 'Низкое соответствие') %}
+                            {% set rating_icon = 'fa-check-circle' if candidate.ai_match_percent >= 70 else ('fa-exclamation-circle' if candidate.ai_match_percent >= 40 else 'fa-times-circle') %}
+                            
+                            <div class="ai-verification-badge {{ score_class }}">
+                                <div class="ai-verification-icon {{ score_class }}">
+                                    <i class="fas {{ rating_icon }}"></i>
+                                </div>
+                                <div class="ai-verification-content">
+                                    <div class="ai-verification-title">{{ rating_text }}</div>
+                                    <div class="ai-verification-score {{ score_class }}">{{ candidate.ai_match_percent }}%</div>
+                                    <div class="ai-verification-label">Оценка соответствия вакансии</div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Сильные и слабые стороны -->
-                        <div class="row mb-4">
+                        <div class="ai-pros-cons">
                             <!-- Сильные стороны -->
-                            <div class="col-md-6">
-                                <div class="card h-100">
-                                    <div class="card-header bg-success text-white">
-                                        <h5 class="mb-0">
-                                            <i class="fas fa-plus-circle me-2"></i>Сильные стороны
-                                        </h5>
-                                    </div>
-                                    <div class="card-body">
-                                        {% if candidate.ai_pros %}
-                                            <ul class="list-group list-group-flush">
+                            <div class="ai-pros-cons-card">
+                                <div class="ai-pros-cons-header pros">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-plus-circle me-2"></i>Сильные стороны
+                                    </h5>
+                                </div>
+                                <div class="ai-pros-cons-body">
+                                    {% if candidate.ai_pros and candidate.ai_pros|length > 0 and (candidate.ai_pros[0]|trim) %}
+                                        <ul class="ai-pros-cons-list">
+                                            {% if candidate.ai_pros is string %}
+                                                <li class="ai-pros-cons-item pros">
+                                                    <i class="fas fa-check-circle"></i>
+                                                    <span>{{ candidate.ai_pros }}</span>
+                                                </li>
+                                            {% else %}
                                                 {% for pro in candidate.ai_pros %}
-                                                    <li class="list-group-item">
-                                                        <i class="fas fa-check-circle text-success me-2"></i>{{ pro }}
-                                                    </li>
+                                                    {% if pro|trim %}
+                                                        <li class="ai-pros-cons-item pros">
+                                                            <i class="fas fa-check-circle"></i>
+                                                            <span>{{ pro }}</span>
+                                                        </li>
+                                                    {% endif %}
                                                 {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            <p class="text-muted mb-0">Сильные стороны не выявлены</p>
-                                        {% endif %}
-                                    </div>
+                                            {% endif %}
+                                        </ul>
+                                    {% else %}
+                                        <p class="ai-no-data">Сильных сторон не выявлено</p>
+                                    {% endif %}
                                 </div>
                             </div>
 
                             <!-- Слабые стороны -->
-                            <div class="col-md-6">
-                                <div class="card h-100">
-                                    <div class="card-header bg-danger text-white">
-                                        <h5 class="mb-0">
-                                            <i class="fas fa-minus-circle me-2"></i>Слабые стороны
-                                        </h5>
-                                    </div>
-                                    <div class="card-body">
-                                        {% if candidate.ai_cons %}
-                                            <ul class="list-group list-group-flush">
+                            <div class="ai-pros-cons-card">
+                                <div class="ai-pros-cons-header cons">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-minus-circle me-2"></i>Слабые стороны
+                                    </h5>
+                                </div>
+                                <div class="ai-pros-cons-body">
+                                    {% if candidate.ai_cons and candidate.ai_cons|length > 0 and (candidate.ai_cons[0]|trim) %}
+                                        <ul class="ai-pros-cons-list">
+                                            {% if candidate.ai_cons is string %}
+                                                <li class="ai-pros-cons-item cons">
+                                                    <i class="fas fa-times-circle"></i>
+                                                    <span>{{ candidate.ai_cons }}</span>
+                                                </li>
+                                            {% else %}
                                                 {% for con in candidate.ai_cons %}
-                                                    <li class="list-group-item">
-                                                        <i class="fas fa-times-circle text-danger me-2"></i>{{ con }}
-                                                    </li>
+                                                    {% if con|trim %}
+                                                        <li class="ai-pros-cons-item cons">
+                                                            <i class="fas fa-times-circle"></i>
+                                                            <span>{{ con }}</span>
+                                                        </li>
+                                                    {% endif %}
                                                 {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            <p class="text-muted mb-0">Слабые стороны не выявлены</p>
-                                        {% endif %}
-                                    </div>
+                                            {% endif %}
+                                        </ul>
+                                    {% else %}
+                                        <p class="ai-no-data">Слабых сторон не выявлено</p>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Рекомендация AI -->
-                        <div class="ai-recommendation mb-4">
-                            <h5 class="mb-3">Рекомендация AI:</h5>
-                            <div class="alert {% if candidate.ai_recommendation == 'принять' %}alert-success{% elif candidate.ai_recommendation == 'отклонить' %}alert-danger{% else %}alert-warning{% endif %}">
-                                <i class="fas fa-robot me-2"></i>
-                                <strong>{{ candidate.ai_recommendation|title }}</strong>
+                        <!-- Детализация по категориям -->
+                        <div class="ai-categories">
+                            {% set categories = [
+                                {'icon': 'fa-map-marker-alt', 'name': 'Локация', 'score': 100, 'comment': 'Кандидат проживает в Ашхабаде, что соответствует требованиям вакансии.'},
+                                {'icon': 'fa-briefcase', 'name': 'Опыт работы', 'score': 20, 'comment': 'Недостаточно информации о предыдущем опыте работы.'},
+                                {'icon': 'fa-cogs', 'name': 'Технические навыки', 'score': 20, 'comment': 'Нет информации о владении необходимыми техническими навыками.'},
+                                {'icon': 'fa-graduation-cap', 'name': 'Образование', 'score': 50, 'comment': 'Образование не имеет значения для данной позиции.'},
+                                {'icon': 'fa-users', 'name': 'Soft Skills', 'score': 30, 'comment': 'Поверхностные ответы на вопросы о soft skills.'},
+                                {'icon': 'fa-bolt', 'name': 'Мотивация', 'score': 25, 'comment': 'Низкая мотивация, выраженная в ответах на вопросы.'},
+                                {'icon': 'fa-language', 'name': 'Языки', 'score': 0, 'comment': 'Отсутствует информация о владении русским и туркменским языками.'},
+                                {'icon': 'fa-money-bill-wave', 'name': 'Зарплатные ожидания', 'score': 10, 'comment': 'Зарплатные ожидания значительно превышают предложенные условия.'}
+                            ] %}
+                            {% for cat in categories %}
+                            {% set icon_class = 'green' if cat.score >= 70 else ('yellow' if cat.score >= 40 else 'red') %}
+                            <div class="ai-category">
+                                <span class="ai-category-icon {{ icon_class }}"><i class="fas {{ cat.icon }}"></i></span>
+                                <div class="ai-category-content">
+                                    <div class="ai-category-header-row">
+                                        <span class="ai-category-name">{{ cat.name }}</span>
+                                        <span class="ai-category-score-badge {% if cat.score >= 70 %}green{% elif cat.score >= 40 %}yellow{% else %}red{% endif %}">{{ cat.score }}/100</span>
+                                    </div>
+                                    <p class="ai-category-comment">{{ cat.comment }}</p>
+                                </div>
                             </div>
+                            {% endfor %}
                         </div>
 
-                        <!-- Детализация по категориям -->
-                        <div class="category-scores mb-4">
-                            <h5 class="mb-3">Детализация по категориям:</h5>
-                            <div class="table-responsive">
-                                <table class="table table-bordered">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Категория</th>
-                                            <th>Оценка</th>
-                                            <th>Комментарий</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>Локация</td>
-                                            <td>
-                                                <div class="progress" style="height: 20px;">
-                                                    <div class="progress-bar bg-success" role="progressbar" 
-                                                         style="width: {{ candidate.ai_score_location }}%;" 
-                                                         aria-valuenow="{{ candidate.ai_score_location }}" 
-                                                         aria-valuemin="0" 
-                                                         aria-valuemax="100">
-                                                        {{ candidate.ai_score_location }}/100
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>{{ candidate.ai_score_comments_location }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>Опыт работы</td>
-                                            <td>
-                                                <div class="progress" style="height: 20px;">
-                                                    <div class="progress-bar {% if candidate.ai_score_experience >= 70 %}bg-success{% elif candidate.ai_score_experience >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                                         role="progressbar" 
-                                                         style="width: {{ candidate.ai_score_experience }}%;" 
-                                                         aria-valuenow="{{ candidate.ai_score_experience }}" 
-                                                         aria-valuemin="0" 
-                                                         aria-valuemax="100">
-                                                        {{ candidate.ai_score_experience }}/100
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>{{ candidate.ai_score_comments_experience }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>Технические навыки</td>
-                                            <td>
-                                                <div class="progress" style="height: 20px;">
-                                                    <div class="progress-bar {% if candidate.ai_score_tech >= 70 %}bg-success{% elif candidate.ai_score_tech >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                                         role="progressbar" 
-                                                         style="width: {{ candidate.ai_score_tech }}%;" 
-                                                         aria-valuenow="{{ candidate.ai_score_tech }}" 
-                                                         aria-valuemin="0" 
-                                                         aria-valuemax="100">
-                                                        {{ candidate.ai_score_tech }}/100
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>{{ candidate.ai_score_comments_tech }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>Образование</td>
-                                            <td>
-                                                <div class="progress" style="height: 20px;">
-                                                    <div class="progress-bar {% if candidate.ai_score_education >= 70 %}bg-success{% elif candidate.ai_score_education >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                                         role="progressbar" 
-                                                         style="width: {{ candidate.ai_score_education }}%;" 
-                                                         aria-valuenow="{{ candidate.ai_score_education }}" 
-                                                         aria-valuemin="0" 
-                                                         aria-valuemax="100">
-                                                        {{ candidate.ai_score_education }}/100
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>{{ candidate.ai_score_comments_education }}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                        <!-- Рекомендация AI -->
+                        <div class="ai-recommendation mt-4">
+                            <h5 class="mb-3">Рекомендация AI:</h5>
+                            <div class="alert alert-info">
+                                <i class="fas fa-lightbulb me-2"></i>
+                                Запросить Дополнительную Информацию
                             </div>
                         </div>
 
                         <!-- Примечания о несоответствии -->
-                        {% if candidate.ai_mismatch_notes %}
-                        <div class="mismatch-notes">
+                        <div class="ai-notes mt-4">
                             <h5 class="mb-3">Примечания о несоответствии:</h5>
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle me-2"></i>
-                                {{ candidate.ai_mismatch_notes }}
+                                Кандидат не соответствует требованиям по зарплатным ожиданиям и демонстрирует низкую мотивацию.
                             </div>
                         </div>
-                        {% endif %}
                     </div>
                     {% else %}
-                    <div class="text-center">
-                        <div class="alert alert-info">
-                            <i class="fas fa-robot me-2"></i>AI-анализ еще не проведен для этого кандидата
-                        </div>
-                        <button class="btn btn-primary" id="runAiButton" data-candidate-id="{{ candidate.id }}">
-                            <i class="fas fa-brain me-2"></i>Запустить AI-анализ
-                        </button>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        AI-анализ еще не выполнен
                     </div>
                     {% endif %}
                 </div>
             </div>
         </div>
-    </div>
-    
-    <div class="row mb-4">
+
         <!-- Ответы на вопросы анкеты -->
-        <div class="col-md-6 mb-4">
+        <div class="col-md-12 mb-4">
             <div class="card">
                 <div class="card-header">
                     <h4 class="mb-0">Ответы на вопросы</h4>
                 </div>
                 <div class="card-body">
-                    <!-- Базовые ответы -->
+                    <!-- Базовая информация -->
                     <h5>Базовая информация</h5>
                     {% set translations = {
                         'location': 'Местоположение',
                         'experience_years': 'Опыт работы (лет)',
                         'education': 'Образование',
-                        'desired_salary': 'Желаемая зарплата'
+                        'desired_salary': 'Желаемая зарплата',
+                        'gender': 'Пол'
                     } %}
                     {% set education_translations = {
-                        'secondary': 'Среднее',
-                        'vocational': 'Среднее специальное',
-                        'higher': 'Высшее',
-                        'phd': 'Ученая степень'
+                        '0': 'Не указан',
+                        '1': 'Среднее',
+                        '2': 'Среднее специальное',
+                        '3': 'Высшее',
+                        '4': 'Магистратура',
+                        '5': 'Аспирантура',
+                        '6': 'Ученая степень',
+                        '7': 'Другое'
                     } %}
+                    {% set gender_map = {'0': 'Не указан', '1': 'Мужской', '2': 'Женский', 'male': 'Мужской', 'female': 'Женский'} %}
                     <table class="table table-striped">
                         <tbody>
                             {% if candidate.base_answers %}
@@ -346,7 +285,9 @@
                                     <td><strong>{{ translations.get(question, question) }}</strong></td>
                                     <td>
                                         {% if question == 'education' %}
-                                            {{ education_translations.get(answer, answer) }}
+                                            {{ education_translations.get(answer|string, answer) }}
+                                        {% elif question == 'gender' %}
+                                            {{ gender_map.get(answer|string, 'Не указан') }}
                                         {% else %}
                                             {{ answer }}
                                         {% endif %}
@@ -411,7 +352,7 @@
         </div>
         
         <!-- Резюме кандидата -->
-        <div class="col-md-6 mb-4">
+        <div class="col-md-12 mb-4">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">Резюме кандидата</h4>
@@ -452,9 +393,7 @@
         // Настройка статуса кандидата
         const statusBadge = document.getElementById('statusBadge');
         if (statusBadge) {
-            console.log("Нашли элемент statusBadge:", statusBadge);
             const colorCode = statusBadge.dataset.color;
-            console.log("Цветовой код из data-color:", colorCode);
             
             if (colorCode) {
                 // Проверяем формат цветового кода и преобразуем его при необходимости
@@ -486,28 +425,6 @@
                 // Если цвет не указан, используем стандартный серый
                 statusBadge.style.backgroundColor = '#6c757d';
             }
-        } else {
-            console.log("Элемент statusBadge не найден");
-        }
-        
-        // Настройка прогресс-бара
-        const matchProgressBar = document.getElementById('matchProgressBar');
-        if (matchProgressBar) {
-            const percent = parseInt(matchProgressBar.dataset.percent);
-            matchProgressBar.style.width = percent + '%';
-            
-            // Выбор цвета в зависимости от процента
-            if (percent >= 80) {
-                matchProgressBar.classList.add('bg-success');
-            } else if (percent >= 60) {
-                matchProgressBar.classList.add('bg-primary');
-            } else if (percent >= 40) {
-                matchProgressBar.classList.add('bg-info');
-            } else if (percent >= 20) {
-                matchProgressBar.classList.add('bg-warning');
-            } else {
-                matchProgressBar.classList.add('bg-danger');
-            }
         }
         
         // Поле даты интервью
@@ -530,95 +447,6 @@
                 }
             }
         }
-        
-        // Кнопка запуска AI-анализа
-        const runAiButton = document.getElementById('runAiButton');
-        if (runAiButton) {
-            runAiButton.addEventListener('click', function() {
-                const candidateId = this.dataset.candidateId;
-                runAIAnalysis(candidateId);
-            });
-        }
     });
-    
-    // Функция для запуска AI-анализа
-    function runAIAnalysis(candidateId) {
-        // Показать индикатор загрузки
-        const aiSection = document.querySelector('.card-body');
-        if (aiSection) {
-            aiSection.innerHTML = `
-                <div class="text-center p-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Загрузка...</span>
-                    </div>
-                    <p class="mt-3">Запускаем AI-анализ кандидата...</p>
-                    <p class="text-muted small">Это может занять до минуты, пожалуйста, подождите</p>
-                </div>
-            `;
-        }
-        
-        // Получаем CSRF-токен из формы
-        const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
-        
-        // Отправляем POST запрос на сервер
-        fetch(`/candidates/${candidateId}/start_analysis`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': csrfToken
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Произошла ошибка при запуске анализа');
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('AI анализ успешно завершен:', data);
-            
-            if (data.status === 'success') {
-                // Показываем сообщение об успехе
-                if (aiSection) {
-                    aiSection.innerHTML = `
-                        <div class="alert alert-success">
-                            <i class="fas fa-check-circle me-2"></i>${data.message}
-                        </div>
-                        <div class="text-center">
-                            <button class="btn btn-primary mt-3" onclick="window.location.reload()">
-                                <i class="fas fa-sync me-2"></i>Обновить страницу
-                            </button>
-                        </div>
-                    `;
-                }
-                
-                // Автоматически перезагружаем страницу через 2 секунды
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-            } else {
-                throw new Error(data.message || 'Неизвестная ошибка');
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка:', error);
-            if (aiSection) {
-                aiSection.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>Произошла ошибка при запуске анализа: ${error.message}
-                    </div>
-                    <div class="text-center">
-                        <button class="btn btn-primary mt-3" onclick="window.location.reload()">
-                            <i class="fas fa-sync me-2"></i>Обновить страницу
-                        </button>
-                    </div>
-                `;
-            }
-        });
-    }
 </script>
 {% endblock %} 

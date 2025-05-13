@@ -352,4 +352,395 @@ h1 {
 
 .accent-border {
     border-color: var(--accent-color);
+}
+
+/* Убираем лишние отступы между карточками */
+.card + .card {
+    margin-top: 1.2rem;
+}
+
+/* Базовая информация: пол */
+.gender-label {
+    font-weight: 500;
+    color: var(--primary-color);
+}
+.gender-value {
+    font-weight: 500;
+    color: #059669;
+}
+
+/* Анимации для AI-анализа */
+@keyframes pulse-verification {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulse-score {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.05); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Стили для AI-анализа */
+.ai-analysis {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* AI-анализ: карточки категорий */
+.ai-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ai-category {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background: var(--background-light);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    padding: 1rem 1.25rem;
+    min-height: 80px;
+    margin-bottom: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ai-category:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.ai-category-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #f8f9fa;
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    margin-top: 0.1em;
+    opacity: 0.85;
+}
+
+.ai-category-icon.green {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.ai-category-icon.yellow {
+    background: #fef9c3;
+    color: #b45309;
+}
+
+.ai-category-icon.red {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.ai-category-content {
+    flex: 1;
+}
+
+.ai-category-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.ai-category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.ai-category-name {
+    font-weight: 600;
+    font-size: 1.08rem;
+    color: var(--primary-color);
+}
+
+.ai-category-score {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.ai-category-score-badge {
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 0.2em 0.7em;
+    font-size: 1rem;
+    margin-left: auto;
+    background: #e9ecef;
+    color: #333;
+    min-width: 60px;
+    text-align: center;
+}
+
+.ai-category-score-badge.green { 
+    background: #d1fae5; 
+    color: #059669; 
+}
+
+.ai-category-score-badge.yellow { 
+    background: #fef9c3; 
+    color: #b45309; 
+}
+
+.ai-category-score-badge.red { 
+    background: #fee2e2; 
+    color: #b91c1c; 
+}
+
+.ai-category-comment {
+    color: var(--text-secondary);
+    font-size: 0.97rem;
+    margin-bottom: 0;
+}
+
+/* AI-анализ: сильные/слабые стороны */
+.ai-pros-cons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.ai-pros-cons-card {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+
+.ai-pros-cons-header {
+    padding: 0.75rem 1rem;
+    color: white;
+}
+
+.ai-pros-cons-header.pros {
+    background-color: #059669;
+    color: #fff;
+}
+
+.ai-pros-cons-header.cons {
+    background-color: #b91c1c;
+    color: #fff;
+}
+
+.ai-pros-cons-body {
+    padding: 0.7rem 1rem 0.7rem 1.2rem;
+}
+
+.ai-pros-cons-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.ai-pros-cons-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    font-size: 1.01rem;
+}
+
+.ai-pros-cons-item i {
+    font-size: 1.1rem;
+}
+
+.ai-pros-cons-item.pros i {
+    color: #059669;
+}
+
+.ai-pros-cons-item.cons i {
+    color: #b91c1c;
+}
+
+.ai-no-data {
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
+    padding: 0.7rem 0;
+}
+
+/* AI-анализ: общая оценка - верификация Instagram */
+.ai-verification-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border: 1px solid rgba(0,0,0,0.05);
+    width: 100%;
+    max-width: 500px;
+    margin: 2rem auto;
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-verification-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(17, 153, 142, 0.1), rgba(56, 239, 125, 0.1));
+    z-index: 0;
+}
+
+.ai-verification-badge.high::before {
+    background: linear-gradient(135deg, rgba(17, 153, 142, 0.1), rgba(56, 239, 125, 0.1));
+}
+
+.ai-verification-badge.medium::before {
+    background: linear-gradient(135deg, rgba(242, 153, 74, 0.1), rgba(242, 201, 76, 0.1));
+}
+
+.ai-verification-badge.low::before {
+    background: linear-gradient(135deg, rgba(235, 51, 73, 0.1), rgba(244, 92, 67, 0.1));
+}
+
+.ai-verification-icon {
+    font-size: 2.5rem;
+    z-index: 1;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    animation: pulse-verification 2s infinite ease-in-out;
+}
+
+.ai-verification-icon.high {
+    color: #11998e;
+}
+
+.ai-verification-icon.medium {
+    color: #f2994a;
+}
+
+.ai-verification-icon.low {
+    color: #eb3349;
+}
+
+.ai-verification-content {
+    z-index: 1;
+    flex: 1;
+}
+
+.ai-verification-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #333;
+}
+
+.ai-verification-score {
+    font-size: 2.8rem;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.ai-verification-score.high {
+    background: linear-gradient(135deg, #11998e, #38ef7d);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.ai-verification-score.medium {
+    background: linear-gradient(135deg, #f2994a, #f2c94c);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.ai-verification-score.low {
+    background: linear-gradient(135deg, #eb3349, #f45c43);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.ai-verification-label {
+    font-size: 1rem;
+    color: #6c757d;
+}
+
+/* Прогресс-бар для оценки соответствия */
+.ai-match-score-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 1.5rem 0 2rem;
+}
+
+.ai-match-progress {
+    width: 100%;
+    max-width: 500px;
+    height: 8px;
+    border-radius: 4px;
+    background: #e9ecef;
+    margin: 1rem auto 0;
+    overflow: hidden;
+}
+
+.ai-match-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+}
+
+.ai-match-progress-bar.high {
+    background: linear-gradient(90deg, #11998e, #38ef7d);
+}
+
+.ai-match-progress-bar.medium {
+    background: linear-gradient(90deg, #f2994a, #f2c94c);
+}
+
+.ai-match-progress-bar.low {
+    background: linear-gradient(90deg, #eb3349, #f45c43);
+}
+
+/* Устаревшие стили для оценки (сохранены для обратной совместимости) */
+.ai-score-container {
+    position: relative;
+    margin-bottom: 1.2rem;
+}
+
+.ai-score-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: 800;
+    z-index: 2;
+    font-size: 1.25rem;
+    letter-spacing: 0.5px;
+    text-shadow: 0px 1px 2px rgba(0,0,0,0.2);
+    background: rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 0 12px;
+    box-shadow: 0 0 8px rgba(255,255,255,0.5);
+    animation: pulse-score 2s infinite ease-in-out;
+}
+
+.ai-score-value.over-bar {
+    color: #fff;
 } 

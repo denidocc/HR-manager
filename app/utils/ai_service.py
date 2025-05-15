@@ -13,7 +13,7 @@ import time
 from dotenv import load_dotenv  # Добавляем импорт для перезагрузки переменных окружения
 import base64
 import docx
-import fitz  # PyMuPDF для работы с PDF
+import fitz
 from PIL import Image
 import io
 from datetime import datetime, timezone, timedelta
@@ -56,7 +56,7 @@ def test_openai_api_key():
         
         # Выполняем простой запрос для проверки ключа
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "Ты - помощник."},
                 {"role": "user", "content": "Скажи 'Ключ работает!' одной строкой"}
@@ -1223,7 +1223,7 @@ def analyze_vacancy_requirements(vacancy_description):
         client = OpenAI(api_key=api_key)
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "Ты - HR-аналитик, специализирующийся на анализе вакансий."},
                 {"role": "user", "content": prompt}
@@ -1243,3 +1243,148 @@ def analyze_vacancy_requirements(vacancy_description):
     except Exception as e:
         current_app.logger.error(f"Ошибка при анализе требований вакансии: {str(e)}")
         return None 
+
+def generate_vacancy_with_ai(title, employment_type, description_tasks, description_conditions):
+    """
+    Генерирует полные данные вакансии с помощью OpenAI API на основе базовой информации
+    
+    Args:
+        title (str): Название вакансии
+        employment_type (str): Тип занятости
+        description_tasks (str): Базовое описание задач
+        description_conditions (str): Базовые условия работы
+        
+    Returns:
+        dict: Словарь с сгенерированными данными для вакансии или None в случае ошибки
+    """
+    try:
+        # Получаем API ключ из конфигурации или переменных окружения
+        api_key = current_app.config.get('OPENAI_API_KEY')
+        if not api_key:
+            api_key = os.environ.get('OPENAI_API_KEY')
+            
+        # Проверяем валидность ключа
+        if not api_key or "your-" in api_key or len(api_key.strip()) < 20:
+            current_app.logger.error("OpenAI API ключ невалидный или отсутствует")
+            return None
+        
+        # Создаем клиента OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        # Формируем запрос к API
+        prompt = f"""
+        Ты - опытный HR-специалист, который помогает создать профессиональную вакансию. 
+        Используй предоставленную информацию для создания полной и привлекательной вакансии.
+        
+        Базовая информация:
+        - Название вакансии: {title}
+        - Тип занятости: {employment_type}
+        - Описание задач: {description_tasks}
+        - Условия работы: {description_conditions}
+        
+        Создай следующие разделы:
+        1. Улучшенное название вакансии (если нужно)
+        2. Подробное описание задач с форматированием (маркированные списки, абзацы)
+        3. Расширенные условия работы с форматированием
+        4. Описание идеального кандидата (требования, навыки, опыт)
+        5. 7 профессиональных вопросов для кандидата
+        6. 7 вопросов на soft skills
+        
+        Формат ответа должен быть в виде JSON:
+        {{
+            "title": "Улучшенное название вакансии",
+            "description_tasks": "Подробное описание задач",
+            "description_conditions": "Расширенные условия работы",
+            "ideal_profile": "Описание идеального кандидата",
+            "questions": [
+                {{"id": 1, "text": "Вопрос 1", "type": "text"}},
+                {{"id": 2, "text": "Вопрос 2", "type": "text"}},
+                ...
+            ],
+            "soft_questions": [
+                {{"id": 1, "text": "Вопрос 1", "type": "text"}},
+                {{"id": 2, "text": "Вопрос 2", "type": "text"}},
+                ...
+            ]
+        }}
+        
+        Важно:
+        - Используй форматирование текста (маркированные списки, абзацы)
+        - Вопросы должны быть релевантными для данной вакансии
+        - Все поля должны быть на русском языке
+        - Ответ должен быть только в формате JSON без дополнительного текста
+        """
+        
+        # Отправляем запрос к OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Ты - опытный HR-специалист, который создает профессиональные вакансии. Твой ответ должен быть в формате JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=4000
+        )
+        
+        # Получаем ответ
+        result = response.choices[0].message.content
+        
+        # Проверяем, что ответ содержит валидный JSON
+        # Ищем JSON в ответе (на случай, если модель добавила лишний текст)
+        import re
+        json_match = re.search(r'({[\s\S]*})', result)
+        if json_match:
+            result = json_match.group(1)
+        
+        # Парсим JSON
+        try:
+            vacancy_data = json.loads(result)
+            
+            # Проверяем наличие всех необходимых полей
+            required_fields = ['title', 'description_tasks', 'description_conditions', 'ideal_profile', 'questions', 'soft_questions']
+            for field in required_fields:
+                if field not in vacancy_data:
+                    current_app.logger.warning(f"В ответе API отсутствует поле {field}")
+                    # Если поле отсутствует, добавляем пустое значение
+                    if field in ['questions', 'soft_questions']:
+                        vacancy_data[field] = []
+                    else:
+                        vacancy_data[field] = ""
+            
+            # Проверяем и корректируем формат вопросов
+            for question_type in ['questions', 'soft_questions']:
+                if not isinstance(vacancy_data[question_type], list):
+                    vacancy_data[question_type] = []
+                else:
+                    # Проверяем каждый вопрос и добавляем id и type, если их нет
+                    for i, q in enumerate(vacancy_data[question_type]):
+                        if isinstance(q, str):
+                            # Если вопрос - это просто строка, преобразуем его в словарь
+                            vacancy_data[question_type][i] = {"id": i+1, "text": q, "type": "text"}
+                        elif isinstance(q, dict):
+                            # Если вопрос - словарь, проверяем наличие необходимых полей
+                            if 'id' not in q:
+                                q['id'] = i+1
+                            if 'text' not in q:
+                                q['text'] = f"Вопрос {i+1}"
+                            if 'type' not in q:
+                                q['type'] = "text"
+            
+            # Ограничиваем количество вопросов до 7
+            if len(vacancy_data['questions']) > 7:
+                vacancy_data['questions'] = vacancy_data['questions'][:7]
+            if len(vacancy_data['soft_questions']) > 7:
+                vacancy_data['soft_questions'] = vacancy_data['soft_questions'][:7]
+                
+        except json.JSONDecodeError:
+            current_app.logger.error(f"Не удалось распарсить JSON из ответа API: {result[:500]}")
+            return None
+        
+        # Логируем успешную генерацию
+        current_app.logger.info(f"Успешно сгенерирована вакансия с помощью AI: {vacancy_data['title']}")
+        
+        return vacancy_data
+        
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при генерации вакансии с помощью AI: {str(e)}")
+        return None

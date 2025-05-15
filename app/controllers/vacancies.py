@@ -5,11 +5,13 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from app import db
 from app.models import Vacancy, C_Employment_Type, SystemLog, Candidate
-from app.forms.vacancy import VacancyForm
+from app.forms.vacancy import VacancyForm, VacancyAIGeneratorForm
 import json
 import logging
 import traceback
 from app.utils.decorators import profile_time
+from app.utils.ai_service import generate_vacancy_with_ai
+from datetime import datetime, timezone
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
@@ -59,7 +61,7 @@ def create():
     
     # Заполняем select с типами занятости
     form.id_c_employment_type.choices = [
-        (0, 'Выберите тип занятости')
+        ('', 'Выберите тип занятости')
     ] + [(t.id, t.name) for t in C_Employment_Type.query.all()]
     
     if request.method == 'POST':
@@ -75,14 +77,15 @@ def create():
         logger.info(f"Получены данные soft-вопросов из запроса: {soft_questions_json}")
         logger.info(f"Form data для вопросов: {form.questions_json.data}")
         logger.info(f"Form data для soft-вопросов: {form.soft_questions_json.data}")
-        
+        logger.info(f"Тип занятости: {form.id_c_employment_type.data}")
+            
         # Если форма не валидна, логируем ошибки и отображаем форму снова
         if not form.validate_on_submit():
             logger.warning(f"Форма не прошла валидацию. Ошибки: {form.errors}")
             return render_template('vacancies/create.html', form=form, title='Создание вакансии')
             
         # Валидация выбора типа занятости
-        if form.id_c_employment_type.data == 0:
+        if form.id_c_employment_type.data is None:
             form.id_c_employment_type.errors.append('Выберите тип занятости')
             return render_template('vacancies/create.html', form=form, title='Создание вакансии')
         
@@ -174,7 +177,7 @@ def edit(id):
     
     # Заполняем select с типами занятости
     form.id_c_employment_type.choices = [
-        (0, 'Выберите тип занятости')
+        ('', 'Выберите тип занятости')
     ] + [(t.id, t.name) for t in C_Employment_Type.query.all()]
     
     # При GET запросе подготавливаем форму с существующими данными
@@ -228,6 +231,7 @@ def edit(id):
     if request.method == 'POST':
         logger.info(f"POST: Редактирование вакансии ID={id}")
         logger.info(f"POST: Список всех полей формы: {list(request.form.keys())}")
+        logger.info(f"POST: Тип занятости: {form.id_c_employment_type.data}")
         
         # Если форма не валидна, логируем ошибки
         if not form.validate_on_submit():
@@ -235,7 +239,7 @@ def edit(id):
             return render_template('vacancies/edit.html', form=form, vacancy=vacancy, title='Редактирование вакансии')
             
         # Валидация выбора типа занятости
-        if form.id_c_employment_type.data == 0:
+        if form.id_c_employment_type.data is None:
             form.id_c_employment_type.errors.append('Выберите тип занятости')
             return render_template('vacancies/edit.html', form=form, vacancy=vacancy, title='Редактирование вакансии')
         
@@ -433,4 +437,91 @@ def archive(id):
     )
     
     flash(f'Вакансия успешно {"восстановлена" if vacancy.is_active else "архивирована"}', 'success')
-    return redirect(url_for('vacancies.index')) 
+    return redirect(url_for('vacancies.index'))
+
+@vacancies_bp.route('/generate-with-ai', methods=['POST'])
+@profile_time
+@login_required
+def generate_with_ai():
+    """Генерация вакансии с помощью ИИ"""
+    # Подробное логирование полученных данных
+    logger.info(f"Получены данные для генерации вакансии: {request.form}")
+    logger.info(f"id_c_employment_type из формы: {request.form.get('id_c_employment_type')}")
+    logger.info(f"Тип данных id_c_employment_type: {type(request.form.get('id_c_employment_type'))}")
+    
+    # Проверяем наличие всех необходимых полей
+    required_fields = ['title', 'id_c_employment_type', 'description_tasks', 'description_conditions']
+    errors = {}
+    
+    for field in required_fields:
+        if not request.form.get(field):
+            errors[field] = ['Это поле обязательно']
+    
+    if errors:
+        logger.warning(f"Форма генерации вакансии не прошла валидацию. Ошибки: {errors}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Форма содержит ошибки. Пожалуйста, проверьте введенные данные.',
+            'errors': errors
+        }), 400
+    
+    try:
+        # Получаем данные из формы
+        title = request.form.get('title')
+        id_c_employment_type = int(request.form.get('id_c_employment_type'))
+        description_tasks = request.form.get('description_tasks')
+        description_conditions = request.form.get('description_conditions')
+        
+        # Получаем тип занятости
+        employment_type = C_Employment_Type.query.get(id_c_employment_type)
+        if not employment_type:
+            logger.error(f"Тип занятости с ID={id_c_employment_type} не найден")
+            return jsonify({
+                'status': 'error',
+                'message': 'Выбранный тип занятости не найден.'
+            }), 404
+        
+        # Логируем данные формы для отладки
+        logger.info(f"Генерация вакансии с помощью ИИ. Данные формы: title={title}, employment_type={employment_type.name}, id_c_employment_type={id_c_employment_type}")
+        
+        # Генерируем вакансию с помощью ИИ
+        vacancy_data = generate_vacancy_with_ai(
+            title=title,
+            employment_type=employment_type.name,
+            description_tasks=description_tasks,
+            description_conditions=description_conditions
+        )
+        
+        if not vacancy_data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Не удалось сгенерировать вакансию. Пожалуйста, попробуйте еще раз.'
+            }), 500
+        
+        # Логирование
+        SystemLog.log(
+            event_type="generate_vacancy_with_ai",
+            description=f"Сгенерирована вакансия с помощью ИИ: {vacancy_data['title']}",
+            user_id=current_user.id,
+            ip_address=request.remote_addr
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Вакансия успешно сгенерирована',
+            'data': vacancy_data
+        })
+        
+    except ValueError as e:
+        logger.error(f"Ошибка при преобразовании значения: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Некорректное значение типа занятости'
+        }), 400
+    except Exception as e:
+        logger.error(f"Ошибка при генерации вакансии с помощью ИИ: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'status': 'error',
+            'message': f'Произошла ошибка при генерации вакансии: {str(e)}'
+        }), 500 

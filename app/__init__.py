@@ -13,6 +13,8 @@ from config import config
 from logging.handlers import RotatingFileHandler
 from flask_caching import Cache
 import logging.config
+import re
+from markupsafe import Markup
 
 # Отключаем логирование SQLAlchemy на уровне модуля
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
@@ -30,6 +32,13 @@ argon2 = Argon2()
 csrf = CSRFProtect()
 cache = Cache()
 
+# Функция для преобразования переносов строк в HTML-теги br
+def nl2br(value):
+    if value:
+        value = re.sub(r'\r\n|\r|\n', '<br>', value)
+        return Markup(value)
+    return ''
+
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
@@ -43,6 +52,9 @@ def create_app(config_name='default'):
     argon2.init_app(app)
     csrf.init_app(app)
     cache.init_app(app)
+    
+    # Регистрация пользовательских фильтров Jinja2
+    app.jinja_env.filters['nl2br'] = nl2br
     
     # Создание директории для загрузки файлов, если её нет
     if not os.path.exists(app.config['UPLOAD_FOLDER']):

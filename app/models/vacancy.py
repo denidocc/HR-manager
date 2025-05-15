@@ -27,6 +27,12 @@ class Vacancy(db.Model):
     created_by: so.Mapped[int] = so.mapped_column(sa.Integer, sa.ForeignKey('users.id'), nullable=True)
     company_values: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     
+    # Новые поля для отслеживания использования ИИ
+    is_ai_generated: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=False)  # Использовался ли ИИ для генерации
+    ai_generation_date: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), nullable=True)  # Дата генерации с помощью ИИ
+    ai_generation_prompt: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)  # Запрос, использованный для генерации
+    ai_generation_metadata: so.Mapped[dict] = so.mapped_column(sa.JSON, nullable=True)  # Дополнительные метаданные о генерации
+    
     # Отношения
     creator = so.relationship('User', back_populates='created_vacancies')
     candidates = so.relationship('Candidate', back_populates='vacancy', cascade='all, delete-orphan')
@@ -56,5 +62,7 @@ class Vacancy(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'closed_at': self.closed_at.isoformat() if self.closed_at else None,
-            'creator': self.creator.full_name if self.creator else None
+            'creator': self.creator.full_name if self.creator else None,
+            'is_ai_generated': self.is_ai_generated,
+            'ai_generation_date': self.ai_generation_date.isoformat() if self.ai_generation_date else None
         } 

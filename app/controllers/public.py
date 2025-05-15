@@ -50,7 +50,7 @@ def vacancies():
     employment_types = C_Employment_Type.query.all()
     
     # Базовый запрос: только активные вакансии
-    query = Vacancy.query.filter_by(is_active=True)
+    query = Vacancy.query.filter_by(is_active=True).order_by(Vacancy.created_at.desc())
     
     # Применяем фильтры, если они указаны
     if search_query:

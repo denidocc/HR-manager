@@ -104,9 +104,9 @@ def create_c_candidate_status():
         {'name': 'Заявка подана', 'description': 'Кандидат только что подал заявку', 'color_code': '#3498db'},
         {'name': 'Рассмотрение резюме', 'description': 'Резюме кандидата находится на рассмотрении', 'color_code': '#17a2b8'},
         {'name': 'Назначено интервью', 'description': 'Кандидату назначено собеседование', 'color_code': '#f39c12'},
-        {'name': 'Отклонен', 'description': 'Кандидат не прошел отбор', 'color_code': '#e74c3c'},
+        {'name': 'Ожидает решения', 'description': 'Кандидат ожидает решения после интервью', 'color_code': '#9b59b6'},
         {'name': 'Принят', 'description': 'Кандидат принят на работу', 'color_code': '#2ecc71'},
-        {'name': 'Ожидает решения', 'description': 'Кандидат ожидает решения после интервью', 'color_code': '#9b59b6'}
+        {'name': 'Отклонен', 'description': 'Кандидат не прошел отбор', 'color_code': '#e74c3c'}
     ]
     for i, status in enumerate(statuses):
         existing = C_Candidate_Status.query.filter_by(name=status['name']).first()

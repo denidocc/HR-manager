@@ -17,7 +17,7 @@
         </div>
         <div class="buttons-container">
             <a href="{{ url_for('public_bp.vacancies') }}" class="btn btn-primary">Вы Кандидат?</a>
-            <a href="{{ url_for('auth_bp.login' if not current_user.is_authenticated else 'dashboard_bp.index') }}" class="btn btn-accent">Вы HR?</a>
+            <a href="{{ url_for('auth_bp.login' if not current_user.is_authenticated else 'dashboard.index') }}" class="btn btn-accent">Вы HR?</a>
         </div>
         <div class="subtitle">
             &copy; 2025 Clever HR. Все права защищены.

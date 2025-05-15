@@ -7,7 +7,7 @@ from app import db
 from app.models import Vacancy, Candidate, Notification, SystemLog
 from app.forms.application import ApplicationForm
 from app.utils.file_processing import save_resume, extract_text_from_resume
-from app.utils.ai_service import request_ai_analysis
+from app.utils.ai_service import request_ai_analysis, process_resume_and_analyze
 from app.utils.decorators import profile_time
 import uuid
 import os
@@ -96,27 +96,25 @@ def vacancy_detail(id):
     )
 
 def process_resume_async(candidate_id, resume_path):
-    """Асинхронная обработка резюме и AI-анализ"""
-    app = create_app()
-    
-    with app.app_context():
-        try:
-            candidate = Candidate.query.get(candidate_id)
-            if not candidate:
-                return
+    """
+    Асинхронная обработка резюме
+    """
+    try:
+        # Создаем новый контекст приложения для асинхронной обработки
+        app = create_app()
+        
+        with app.app_context():
+            # Импортируем функцию внутри контекста приложения
+            from app.utils.ai_service import process_resume_and_analyze
             
-            # Извлекаем текст из резюме
-            resume_text = extract_text_from_resume(resume_path)
-            if resume_text:
-                candidate.resume_text = json.dumps(resume_text, ensure_ascii=False)
-                db.session.commit()
-                
-                # Запускаем AI-анализ
-                if 'ai_analysis' in app.config.get('ENABLED_FEATURES', []):
-                    request_ai_analysis(candidate)
-        except Exception as e:
+            # Используем функцию для обработки резюме и запуска анализа
+            process_resume_and_analyze(candidate_id, resume_path)
+        
+    except Exception as e:
+        # Создаем контекст приложения для логирования ошибки
+        app = create_app()
+        with app.app_context():
             app.logger.error(f"Ошибка при асинхронной обработке резюме: {str(e)}", exc_info=True)
-            db.session.rollback()
 
 @public_bp.route('/apply/<int:vacancy_id>', methods=['GET', 'POST'])
 @profile_time
@@ -128,16 +126,16 @@ def apply(vacancy_id):
     if form.validate_on_submit():
         # Проверяем существующую заявку
         existing_application = Candidate.query.filter(
-            and_(
+        and_(
                 Candidate.vacancy_id == vacancy_id,
-                func.pgp_sym_decrypt(
-                    cast(Candidate._phone, sa.LargeBinary),
-                    current_app.config['ENCRYPTION_KEY'],
-                    current_app.config.get('ENCRYPTION_OPTIONS', '')
-                ) == form.phone.data,
-                Candidate.id_c_candidate_status != 3  # Разрешаем повторную подачу, если предыдущая была отклонена
-            )
-        ).first()
+            func.pgp_sym_decrypt(
+                cast(Candidate._phone, sa.LargeBinary),
+                current_app.config['ENCRYPTION_KEY'],
+                current_app.config.get('ENCRYPTION_OPTIONS', '')
+            ) == form.phone.data,
+            Candidate.id_c_candidate_status != 3  # Разрешаем повторную подачу, если предыдущая была отклонена
+        )
+    ).first()
 
         if existing_application:
             flash('Вы уже подавали заявку на эту вакансию с этим номером телефона, пожалуйста, ждите ответа от HR-менеджера', 'warning')
@@ -175,7 +173,7 @@ def apply(vacancy_id):
                 filename = save_resume(resume_file, tracking_code)
                 if filename:
                     resume_path = filename
-            
+                    
             # Создаем базовые ответы
             base_answers = {
                 "location": form.location.data,
@@ -222,15 +220,15 @@ def apply(vacancy_id):
                 ip_address=request.remote_addr
             )
             
-            # Запускаем асинхронную обработку резюме
+            # Запускаем асинхронную обработку резюме и последующий AI-анализ
             if resume_path:
-                thread = Thread(target=process_resume_async, args=(candidate.id, resume_path))
+                thread = Thread(target=process_resume_and_analyze, args=(candidate.id, resume_path))
                 thread.daemon = True
                 thread.start()
             
             flash('Ваша заявка успешно отправлена! Используйте код отслеживания для проверки статуса.', 'success')
             return redirect(url_for('public_bp.application_success', tracking_code=tracking_code))
-            
+        
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Ошибка при сохранении заявки: {str(e)}", exc_info=True)

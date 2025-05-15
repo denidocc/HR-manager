@@ -710,12 +710,9 @@ h1 {
     background: linear-gradient(90deg, #11998e, #38ef7d);
 }
 
-.ai-match-progress-bar.medium {
-    background: linear-gradient(90deg, #f2994a, #f2c94c);
-}
-
-.ai-match-progress-bar.low {
-    background: linear-gradient(90deg, #eb3349, #f45c43);
+/* Высокий прогресс-бар */
+.progress-lg {
+    height: 20px !important;
 }
 
 /* Устаревшие стили для оценки (сохранены для обратной совместимости) */

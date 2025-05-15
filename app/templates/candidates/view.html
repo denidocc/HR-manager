@@ -6,7 +6,7 @@
     <form id="csrf-form" style="display: none;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
     </form>
-
+    
     <div class="row mb-4">
         <div class="col-md-12">
             <nav aria-label="breadcrumb">
@@ -106,8 +106,23 @@
                     </h4>
                 </div>
                 <div class="card-body">
+                    <!-- Индикатор загрузки для AI-анализа -->
+                    <div id="aiLoadingSpinner" class="text-center my-3 d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p class="mt-2">Выполняется AI-анализ кандидата...</p>
+                    </div>
+                    
                     {% if candidate.ai_match_percent is not none %}
                     <div class="ai-analysis">
+                        <!-- Кнопка повторного анализа -->
+                        <div class="text-end mb-3">
+                            <button id="rerunAnalysisBtn" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-sync-alt me-1"></i>Повторный анализ
+                            </button>
+                        </div>
+                        
                         <!-- Общая оценка - новый дизайн в стиле верификации Instagram -->
                         <div class="ai-score-container">
                             <h5 class="mb-3">Общая оценка соответствия:</h5>
@@ -133,10 +148,10 @@
                             <!-- Сильные стороны -->
                             <div class="ai-pros-cons-card">
                                 <div class="ai-pros-cons-header pros">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-plus-circle me-2"></i>Сильные стороны
-                                    </h5>
-                                </div>
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-plus-circle me-2"></i>Сильные стороны
+                                        </h5>
+                                    </div>
                                 <div class="ai-pros-cons-body">
                                     {% if candidate.ai_pros and candidate.ai_pros|length > 0 and (candidate.ai_pros[0]|trim) %}
                                         <ul class="ai-pros-cons-list">
@@ -151,24 +166,24 @@
                                                         <li class="ai-pros-cons-item pros">
                                                             <i class="fas fa-check-circle"></i>
                                                             <span>{{ pro }}</span>
-                                                        </li>
+                                                    </li>
                                                     {% endif %}
                                                 {% endfor %}
                                             {% endif %}
-                                        </ul>
-                                    {% else %}
+                                            </ul>
+                                        {% else %}
                                         <p class="ai-no-data">Сильных сторон не выявлено</p>
-                                    {% endif %}
+                                        {% endif %}
                                 </div>
                             </div>
 
                             <!-- Слабые стороны -->
                             <div class="ai-pros-cons-card">
                                 <div class="ai-pros-cons-header cons">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-minus-circle me-2"></i>Слабые стороны
-                                    </h5>
-                                </div>
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-minus-circle me-2"></i>Слабые стороны
+                                        </h5>
+                                    </div>
                                 <div class="ai-pros-cons-body">
                                     {% if candidate.ai_cons and candidate.ai_cons|length > 0 and (candidate.ai_cons[0]|trim) %}
                                         <ul class="ai-pros-cons-list">
@@ -183,13 +198,68 @@
                                                         <li class="ai-pros-cons-item cons">
                                                             <i class="fas fa-times-circle"></i>
                                                             <span>{{ con }}</span>
-                                                        </li>
+                                                    </li>
                                                     {% endif %}
                                                 {% endfor %}
                                             {% endif %}
-                                        </ul>
-                                    {% else %}
+                                            </ul>
+                                        {% else %}
                                         <p class="ai-no-data">Слабых сторон не выявлено</p>
+                                        {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Несоответствия данных и качество ответов -->
+                        <div class="ai-data-consistency mt-4">
+                            <h5 class="mb-3">Проверка данных и качества ответов</h5>
+                            
+                            <!-- Качество ответов -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0 text-secondary"><i class="fas fa-comment-alt me-2"></i>Качество ответов 
+                                        <span class="badge {% if candidate.ai_answer_quality.overall_quality and ('высок' in candidate.ai_answer_quality.overall_quality|lower or 'хорош' in candidate.ai_answer_quality.overall_quality|lower) %}bg-success{% elif candidate.ai_answer_quality.overall_quality and ('средн' in candidate.ai_answer_quality.overall_quality|lower) %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                            {{ candidate.ai_answer_quality.overall_quality.split(':')[0] if candidate.ai_answer_quality.overall_quality and ':' in candidate.ai_answer_quality.overall_quality else candidate.ai_answer_quality.overall_quality }}
+                                        </span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="col-md-12">
+                                        <div class="col-md-12">
+                                            <dl class="row mb-0">
+                                                <dt class="col-sm-6">Общее качество:</dt>
+                                                <dd class="col-sm-6">
+                                                    <p>{{ candidate.ai_answer_quality.overall_quality}}</p>
+                                                </dd>
+                                            </dl>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <dl class="row mb-0">
+                                                <dt class="col-sm-6">Развернутость:</dt>
+                                                <dd class="col-sm-6">{{ candidate.ai_answer_quality.verbosity }}</dd>
+                                                
+                                                <dt class="col-sm-6">Релевантность:</dt>
+                                                <dd class="col-sm-6">{{ candidate.ai_answer_quality.relevance }}</dd>
+
+                                                <dt class="col-sm-6">Грамотность:</dt>
+                                                <dd class="col-sm-6">{{ candidate.ai_answer_quality.grammar }}</dd>
+                                                
+                                                <dt class="col-sm-6">Структура:</dt>
+                                                <dd class="col-sm-6">{{ candidate.ai_answer_quality.structure }}</dd>
+                                                
+                                            </dl>
+                                        </div>
+                                    </div>
+                                    
+                                    {% if candidate.ai_data_completeness and candidate.ai_data_completeness.low_quality_answers and candidate.ai_data_completeness.answer_quality_issues %}
+                                    <div class="mt-3">
+                                        <h6>Проблемы с качеством ответов:</h6>
+                                        <ul>
+                                            {% for issue in candidate.ai_data_completeness.answer_quality_issues %}
+                                            <li>{{ issue }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
                                     {% endif %}
                                 </div>
                             </div>
@@ -197,15 +267,47 @@
 
                         <!-- Детализация по категориям -->
                         <div class="ai-categories">
+                            {% if candidate.ai_analysis_data and candidate.ai_analysis_data.scores and candidate.ai_analysis_data.score_comments %}
+                            {% set score_mapping = {
+                                'location': {'name': 'Локация', 'icon': 'fa-map-marker-alt'},
+                                'experience': {'name': 'Опыт работы', 'icon': 'fa-briefcase'},
+                                'tech_skills': {'name': 'Технические навыки', 'icon': 'fa-cogs'},
+                                'education': {'name': 'Образование', 'icon': 'fa-graduation-cap'},
+                                'soft_skills': {'name': 'Soft Skills', 'icon': 'fa-users'},
+                                'motivation_and_values': {'name': 'Мотивация', 'icon': 'fa-bolt'},
+                                'employment_stability': {'name': 'Стабильность', 'icon': 'fa-chart-line'},
+                                'experience_relevance': {'name': 'Релевантность опыта', 'icon': 'fa-check-circle'},
+                                'language_skills': {'name': 'Языки', 'icon': 'fa-language'},
+                                'salary_expectations': {'name': 'Зарплатные ожидания', 'icon': 'fa-money-bill-wave'}
+                            } %}
+                            
+                            {% for key, score in candidate.ai_analysis_data.scores.items() %}
+                                {% if score_mapping[key] %}
+                                {% set icon_class = 'green' if score >= 70 else ('yellow' if score >= 40 else 'red') %}
+                                <div class="ai-category">
+                                    <span class="ai-category-icon {{ icon_class }}"><i class="fas {{ score_mapping[key].icon }}"></i></span>
+                                    <div class="ai-category-content">
+                                        <div class="ai-category-header-row">
+                                            <span class="ai-category-name text-secondary">{{ score_mapping[key].name }}</span>
+                                            <span class="ai-category-score-badge {% if score >= 70 %}green{% elif score >= 40 %}yellow{% else %}red{% endif %}">{{ score }}/100</span>
+                                        </div>
+                                        <p class="ai-category-comment text-secondary">{{ candidate.ai_analysis_data.score_comments[key] }}</p>
+                                                    </div>
+                                                </div>
+                                {% endif %}
+                            {% endfor %}
+                            {% else %}
                             {% set categories = [
-                                {'icon': 'fa-map-marker-alt', 'name': 'Локация', 'score': 100, 'comment': 'Кандидат проживает в Ашхабаде, что соответствует требованиям вакансии.'},
-                                {'icon': 'fa-briefcase', 'name': 'Опыт работы', 'score': 20, 'comment': 'Недостаточно информации о предыдущем опыте работы.'},
-                                {'icon': 'fa-cogs', 'name': 'Технические навыки', 'score': 20, 'comment': 'Нет информации о владении необходимыми техническими навыками.'},
-                                {'icon': 'fa-graduation-cap', 'name': 'Образование', 'score': 50, 'comment': 'Образование не имеет значения для данной позиции.'},
-                                {'icon': 'fa-users', 'name': 'Soft Skills', 'score': 30, 'comment': 'Поверхностные ответы на вопросы о soft skills.'},
-                                {'icon': 'fa-bolt', 'name': 'Мотивация', 'score': 25, 'comment': 'Низкая мотивация, выраженная в ответах на вопросы.'},
-                                {'icon': 'fa-language', 'name': 'Языки', 'score': 0, 'comment': 'Отсутствует информация о владении русским и туркменским языками.'},
-                                {'icon': 'fa-money-bill-wave', 'name': 'Зарплатные ожидания', 'score': 10, 'comment': 'Зарплатные ожидания значительно превышают предложенные условия.'}
+                                {'icon': 'fa-map-marker-alt', 'name': 'Локация', 'score': candidate.ai_score_location|default(0), 'comment': candidate.ai_score_comments_location|default('Нет данных')},
+                                {'icon': 'fa-briefcase', 'name': 'Опыт работы', 'score': candidate.ai_score_experience|default(0), 'comment': candidate.ai_score_comments_experience|default('Нет данных')},
+                                {'icon': 'fa-cogs', 'name': 'Технические навыки', 'score': candidate.ai_score_tech|default(0), 'comment': candidate.ai_score_comments_tech|default('Нет данных')},
+                                {'icon': 'fa-graduation-cap', 'name': 'Образование', 'score': candidate.ai_score_education|default(0), 'comment': candidate.ai_score_comments_education|default('Нет данных')},
+                                {'icon': 'fa-users', 'name': 'Soft Skills', 'score': candidate.ai_score_soft|default(0), 'comment': candidate.ai_score_comments_soft|default('Нет данных')},
+                                {'icon': 'fa-bolt', 'name': 'Мотивация', 'score': candidate.ai_score_motivation|default(0), 'comment': candidate.ai_score_comments_motivation|default('Нет данных')},
+                                {'icon': 'fa-chart-line', 'name': 'Стабильность', 'score': candidate.ai_score_stability|default(0), 'comment': candidate.ai_score_comments_stability|default('Нет данных')},
+                                {'icon': 'fa-check-circle', 'name': 'Релевантность опыта', 'score': candidate.ai_score_experience_relevance|default(0), 'comment': candidate.ai_score_comments_experience_relevance|default('Нет данных')},
+                                {'icon': 'fa-language', 'name': 'Языки', 'score': candidate.ai_score_language|default(0), 'comment': candidate.ai_score_comments_language|default('Нет данных')},
+                                {'icon': 'fa-money-bill-wave', 'name': 'Зарплатные ожидания', 'score': candidate.ai_score_salary|default(0), 'comment': candidate.ai_score_comments_salary|default('Нет данных')}
                             ] %}
                             {% for cat in categories %}
                             {% set icon_class = 'green' if cat.score >= 70 else ('yellow' if cat.score >= 40 else 'red') %}
@@ -213,13 +315,14 @@
                                 <span class="ai-category-icon {{ icon_class }}"><i class="fas {{ cat.icon }}"></i></span>
                                 <div class="ai-category-content">
                                     <div class="ai-category-header-row">
-                                        <span class="ai-category-name">{{ cat.name }}</span>
+                                        <span class="ai-category-name text-secondary">{{ cat.name }}</span>
                                         <span class="ai-category-score-badge {% if cat.score >= 70 %}green{% elif cat.score >= 40 %}yellow{% else %}red{% endif %}">{{ cat.score }}/100</span>
                                     </div>
-                                    <p class="ai-category-comment">{{ cat.comment }}</p>
-                                </div>
-                            </div>
+                                    <p class="ai-category-comment text-secondary">{{ cat.comment }}</p>
+                                                    </div>
+                                                </div>
                             {% endfor %}
+                            {% endif %}
                         </div>
 
                         <!-- Рекомендация AI -->
@@ -227,29 +330,98 @@
                             <h5 class="mb-3">Рекомендация AI:</h5>
                             <div class="alert alert-info">
                                 <i class="fas fa-lightbulb me-2"></i>
-                                Запросить Дополнительную Информацию
+                                {{ candidate.ai_recommendation }}
+                            </div>
+                            
+                            <!-- Стоп-факторы -->
+                            <div class="alert alert-danger mt-3">
+                                <h6 class="alert-heading"><i class="fas fa-ban me-2"></i>Критические стоп-факторы:</h6>
+                                <ul class="mb-0">
+                                    {% for factor in candidate.ai_analysis_data.stop_factors %}
+                                    <li>{{ factor }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            
+                            <!-- Генерация ответов с помощью ИИ -->
+                            <div class="alert alert-warning mt-3">
+                                <h6 class="alert-heading"><i class="fas fa-robot me-2"></i>Обнаружены признаки генерации ответов с помощью ИИ!</h6>
+                                {% set ai_probability = candidate.ai_answer_quality.ai_generation_probability|default(0) %}
+                                <div class="progress mt-2 mb-2 progress-lg">
+                                    <div class="progress-bar bg-warning" role="progressbar" 
+                                         aria-valuenow="{{ ai_probability }}" aria-valuemin="0" aria-valuemax="100"
+                                         {% if ai_probability > 0 %}style="width: {{ ai_probability }}%"{% else %}style="width: 0%"{% endif %}>
+                                        {{ ai_probability }}%
+                                                    </div>
+                                                </div>
+                                <p class="mb-0">Вероятность генерации ответов с помощью искусственного интеллекта: <strong>{{ ai_probability }}%</strong></p>
+                                <p class="mb-0 mt-2"><small>Порог для стоп-фактора: 50%</small></p>
+                            </div>
+                            
+                            <!-- Несоответствия данных -->
+                            <div class="alert alert-warning mt-3">
+                                <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Обнаружены несоответствия в данных:</h6>
+                                <ul class="mb-0">
+                                    {% for inconsistency in candidate.ai_data_consistency.inconsistencies %}
+                                    <li>{{ inconsistency }}</li>
+                                    {% endfor %}
+                                </ul>
+                                <div class="mt-2">
+                                    <span class="badge bg-warning text-dark">Уровень серьезности: {{ candidate.ai_data_consistency.severity }}</span>
+                                    <span class="badge bg-info">Уровень доверия: {{ candidate.ai_data_consistency.trust_score }}%</span>
+                                                    </div>
+                                                </div>
+                            
+                            <!-- Вопросы для интервью -->
+                            <div class="card mt-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0 text-secondary"><i class="fas fa-question-circle me-2"></i>Рекомендуемые вопросы для интервью:</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ol class="mb-0">
+                                        {% for question in candidate.ai_analysis_data.interview_questions %}
+                                        <li>{{ question }}</li>
+                                        {% endfor %}
+                                    </ol>
+                                </div>
                             </div>
                         </div>
 
                         <!-- Примечания о несоответствии -->
+                        {% if candidate.ai_mismatch_notes %}
                         <div class="ai-notes mt-4">
                             <h5 class="mb-3">Примечания о несоответствии:</h5>
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle me-2"></i>
-                                Кандидат не соответствует требованиям по зарплатным ожиданиям и демонстрирует низкую мотивацию.
+                                {{ candidate.ai_mismatch_notes }}
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                     {% else %}
-                    <div class="alert alert-info">
+                        <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
                         AI-анализ еще не выполнен
+                        </div>
+                    {% if candidate.resume_text %}
+                    <div class="text-center mt-3">
+                        <button id="startAnalysisBtn" class="btn btn-primary">
+                            <i class="fas fa-robot me-2"></i>Запустить AI-анализ
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="text-center mt-3">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Для запуска анализа необходимо сначала обработать резюме
+                        </div>
                     </div>
                     {% endif %}
-                </div>
+                    {% endif %}
             </div>
         </div>
-
+    </div>
+    
         <!-- Ответы на вопросы анкеты -->
         <div class="col-md-12 mb-4">
             <div class="card">
@@ -356,29 +528,39 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">Резюме кандидата</h4>
+                    <div class="btn-group">
                     {% if resume_file_url %}
-                    <a href="{{ resume_file_url }}" class="btn btn-sm btn-outline-primary" download>
+                    <a href="{{ resume_file_url }}" class="btn btn-sm text-light" download>
                         <i class="fas fa-download me-1"></i>Скачать оригинал
                     </a>
                     {% endif %}
+                        {% if candidate.resume_path %}
+                        <button type="button" id="reprocessResumeBtn" class="btn text-light ms-2">
+                            <i class="fas fa-sync-alt me-1"></i>Распознать текст
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="card-body">
-                    {% if candidate.resume_text %}
-                    <div class="resume-text p-3 border rounded" style="max-height: 500px; overflow-y: auto;">
-                        {{ candidate.resume_text | replace('\n', '<br>') | safe }}
+                    <!-- Индикатор загрузки -->
+                    <div id="resumeProcessingLoader" class="text-center my-3 d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p class="mt-2">Распознавание текста</p>
                     </div>
-                    {% elif resume_file_url %}
-                    <div class="text-center p-4">
-                        <p class="mb-3">Текст резюме не извлечен, но вы можете скачать оригинальный файл</p>
-                        <a href="{{ resume_file_url }}" class="btn btn-primary" download>
-                            <i class="fas fa-download me-2"></i>Скачать резюме
-                        </a>
+                    
+                    <div id="resumeTextContainer">
+                        {% if candidate.resume_text %}
+                        <div class="resume-text-box p-3 bg-light rounded border mb-3">
+                            <pre class="mb-0">{{ candidate.resume_text | replace('```', '') | replace('`', '') }}</pre>
                     </div>
                     {% else %}
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>Кандидат не приложил резюме
+                        <div class="alert alert-warning">
+                            Текст резюме не распознан. Нажмите кнопку "Распознать текст через OpenAI" для обработки.
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -446,6 +628,177 @@
                     interviewDateContainer.style.display = 'none';
                 }
             }
+        }
+        
+        // Обработчик для кнопки повторной обработки резюме
+        const reprocessBtn = document.getElementById('reprocessResumeBtn');
+        if (reprocessBtn) {
+            reprocessBtn.addEventListener('click', function() {
+                if (!confirm('Вы уверены, что хотите повторно распознать текст резюме через OpenAI API? Это может занять некоторое время.')) {
+                    return;
+                }
+                
+                // Показываем индикатор загрузки
+                document.getElementById('resumeProcessingLoader').classList.remove('d-none');
+                reprocessBtn.disabled = true;
+                
+                // Отправляем запрос на обработку резюме
+                fetch('{{ url_for("candidates.reprocess_resume", id=candidate.id) }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Скрываем индикатор загрузки
+                    document.getElementById('resumeProcessingLoader').classList.add('d-none');
+                    reprocessBtn.disabled = false;
+                    
+                    if (data.status === 'success') {
+                        // Обновляем текст резюме на странице
+                        const resumeTextElement = document.getElementById('resumeTextContainer');
+                        if (resumeTextElement) {
+                            resumeTextElement.innerHTML = '<div class="resume-text-box p-3 bg-light rounded border mb-3"><pre class="mb-0">' + data.resume_text + '</pre></div>';
+                        }
+                        
+                        // Показываем уведомление об успехе
+                        showNotification('success', 'Резюме успешно обработано через OpenAI API');
+                    } else {
+                        // Показываем уведомление об ошибке
+                        showNotification('error', data.message);
+                    }
+                })
+                .catch(error => {
+                    // Скрываем индикатор загрузки
+                    document.getElementById('resumeProcessingLoader').classList.add('d-none');
+                    reprocessBtn.disabled = false;
+                    
+                    // Показываем уведомление об ошибке
+                    showNotification('error', 'Произошла ошибка при обработке запроса');
+                    console.error('Error:', error);
+                });
+            });
+        }
+        
+        // Обработчик для кнопки запуска AI-анализа
+        const startAnalysisBtn = document.getElementById('startAnalysisBtn');
+        if (startAnalysisBtn) {
+            startAnalysisBtn.addEventListener('click', function() {
+                // Показываем индикатор загрузки
+                document.getElementById('aiLoadingSpinner').classList.remove('d-none');
+                startAnalysisBtn.disabled = true;
+                
+                // Отправляем запрос на запуск анализа
+                fetch('{{ url_for("candidates.start_analysis", id=candidate.id) }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Скрываем индикатор загрузки
+                    document.getElementById('aiLoadingSpinner').classList.add('d-none');
+                    startAnalysisBtn.disabled = false;
+                    
+                    if (data.status === 'success') {
+                        // Показываем уведомление об успехе
+                        showNotification('success', data.message);
+                        
+                        // Перезагружаем страницу для отображения результатов
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        // Показываем уведомление об ошибке
+                        showNotification('error', data.message);
+                    }
+                })
+                .catch(error => {
+                    // Скрываем индикатор загрузки
+                    document.getElementById('aiLoadingSpinner').classList.add('d-none');
+                    startAnalysisBtn.disabled = false;
+                    
+                    // Показываем уведомление об ошибке
+                    showNotification('error', 'Произошла ошибка при запуске анализа');
+                    console.error('Error:', error);
+                });
+            });
+        }
+        
+        // Обработчик для кнопки повторного AI-анализа
+        const rerunAnalysisBtn = document.getElementById('rerunAnalysisBtn');
+        if (rerunAnalysisBtn) {
+            rerunAnalysisBtn.addEventListener('click', function() {
+                // Показываем индикатор загрузки
+                document.getElementById('aiLoadingSpinner').classList.remove('d-none');
+                rerunAnalysisBtn.disabled = true;
+        
+                // Отправляем запрос на запуск анализа
+                fetch('{{ url_for("candidates.start_analysis", id=candidate.id) }}', {
+            method: 'POST',
+            headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+        .then(data => {
+                    // Скрываем индикатор загрузки
+                    document.getElementById('aiLoadingSpinner').classList.add('d-none');
+                    rerunAnalysisBtn.disabled = false;
+            
+            if (data.status === 'success') {
+                        // Показываем уведомление об успехе
+                        showNotification('success', data.message);
+                        
+                        // Перезагружаем страницу для отображения результатов
+                setTimeout(() => {
+                    window.location.reload();
+                        }, 1500);
+            } else {
+                        // Показываем уведомление об ошибке
+                        showNotification('error', data.message);
+            }
+        })
+        .catch(error => {
+                    // Скрываем индикатор загрузки
+                    document.getElementById('aiLoadingSpinner').classList.add('d-none');
+                    rerunAnalysisBtn.disabled = false;
+                    
+                    // Показываем уведомление об ошибке
+                    showNotification('error', 'Произошла ошибка при запуске анализа');
+                    console.error('Error:', error);
+                });
+            });
+        }
+        
+        // Функция для отображения уведомлений
+        function showNotification(type, message) {
+            const notificationDiv = document.createElement('div');
+            notificationDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} notification`;
+            notificationDiv.innerHTML = message;
+            document.body.appendChild(notificationDiv);
+            
+            // Добавляем стили для уведомления
+            notificationDiv.style.position = 'fixed';
+            notificationDiv.style.top = '20px';
+            notificationDiv.style.right = '20px';
+            notificationDiv.style.zIndex = '9999';
+            notificationDiv.style.minWidth = '300px';
+            notificationDiv.style.padding = '15px';
+            notificationDiv.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+            
+            // Удаляем уведомление через 3 секунды
+            setTimeout(() => {
+                notificationDiv.remove();
+            }, 3000);
         }
     });
 </script>

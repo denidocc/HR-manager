@@ -50,6 +50,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Отключаем логирование SQLAlchemy
+    SQLALCHEMY_ECHO = False
+    
     # Настройки шифрования для PostgreSQL pgp_sym_encrypt
     ENCRYPTION_KEY = get_env_variable('ENCRYPTION_KEY', 'pgp-encryption-key-replace-in-production')
     ENCRYPTION_OPTIONS = get_env_variable('ENCRYPTION_OPTIONS', 'cipher-algo=aes256')
@@ -124,6 +127,12 @@ class Config:
     
     # Включенные функции
     ENABLED_FEATURES = ['ai_analysis']
+
+    # Настройки для отключения логирования SQLAlchemy
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'echo': False,
+        'echo_pool': False
+    }
 
 class DevelopmentConfig(Config):
     DEBUG = True

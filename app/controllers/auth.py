@@ -26,6 +26,16 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def hr_required(f):
+    """Декоратор для проверки прав HR-менеджера"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'hr':
+            flash('Доступ запрещен. Требуются права HR-менеджера.', 'danger')
+            return redirect(url_for('auth_bp.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 @profile_time
 def login():

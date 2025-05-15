@@ -11,11 +11,17 @@ from app.utils.email_service import send_status_change_notification
 from app.utils.decorators import profile_time
 import os
 from werkzeug.utils import secure_filename
-import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from sqlalchemy import desc, func, cast
 import sqlalchemy as sa
+import fitz  # PyMuPDF для работы с PDF
+import numpy as np
+import cv2
+from openai import OpenAI
+import base64
+import docx
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
@@ -149,6 +155,10 @@ def view(id):
         Candidate.ai_score_comments_tech,
         Candidate.ai_score_comments_education,
         Candidate.ai_mismatch_notes,
+        Candidate.ai_data_consistency,
+        Candidate.ai_answer_quality,
+        Candidate.ai_data_completeness,
+        Candidate.ai_analysis_data,
         Candidate.interview_date,
         Candidate.hr_comment,
         Candidate.created_at,
@@ -232,6 +242,10 @@ def view(id):
         'ai_score_comments_tech': candidate_data.ai_score_comments_tech,
         'ai_score_comments_education': candidate_data.ai_score_comments_education,
         'ai_mismatch_notes': candidate_data.ai_mismatch_notes,
+        'ai_data_consistency': candidate_data.ai_data_consistency if candidate_data.ai_data_consistency else {},
+        'ai_answer_quality': candidate_data.ai_answer_quality if candidate_data.ai_answer_quality else {},
+        'ai_data_completeness': candidate_data.ai_data_completeness if candidate_data.ai_data_completeness else {},
+        'ai_analysis_data': candidate_data.ai_analysis_data if candidate_data.ai_analysis_data else {},
         'interview_date': candidate_data.interview_date,
         'hr_comment': candidate_data.hr_comment,
         'created_at': candidate_data.created_at,
@@ -289,14 +303,26 @@ def change_status(id):
         flash('Указан некорректный статус', 'danger')
         return redirect(url_for('candidates.view', id=id))
     
-    # Обновляем статус
+    # Проверка на понижение статуса
     old_status_id = candidate.id_c_candidate_status
+    
+    # Проверяем, не пытаемся ли понизить статус
+    if new_status_id < old_status_id:
+        flash('Нельзя понижать статус кандидата', 'danger')
+        return redirect(url_for('candidates.view', id=id))
+    
+    # Проверяем переход между финальными статусами (Принят/Отклонен)
+    if (old_status_id == 4 and new_status_id == 5) or (old_status_id == 5 and new_status_id == 4):
+        flash('Нельзя менять статус между "Принят" и "Отклонен"', 'danger')
+        return redirect(url_for('candidates.view', id=id))
+    
+    # Обновляем статус
     candidate.id_c_candidate_status = new_status_id
     
     # Если новый статус "Собеседование", то обновляем дату собеседования
     if new_status_id == 2 and interview_date_str:  # ID статуса "Назначено интервью" = 2
         try:
-            interview_date = datetime.datetime.strptime(interview_date_str, '%Y-%m-%dT%H:%M')
+            interview_date = datetime.strptime(interview_date_str, '%Y-%m-%dT%H:%M')
             candidate.interview_date = interview_date
         except ValueError:
             flash('Некорректный формат даты собеседования', 'warning')
@@ -306,23 +332,29 @@ def change_status(id):
     message = f"Статус вашей заявки на вакансию '{candidate.vacancy.title}' изменен на '{status.name}'."
     
     # Специальные типы уведомлений в зависимости от статуса
-    if new_status_id == 2:  # Назначено интервью
+    if new_status_id == 1:  # Рассмотрение резюме
+        notification_type = "candidate_review"
+        message = f"Ваше резюме на вакансию '{candidate.vacancy.title}' рассмотривается."
+    elif new_status_id == 2:  # Назначено интервью
         notification_type = "interview_invitation"
         date_str = candidate.interview_date.strftime('%d.%m.%Y %H:%M') if candidate.interview_date else "будет согласована дополнительно"
         message = f"Приглашаем вас на собеседование по вакансии '{candidate.vacancy.title}'. Дата: {date_str}."
-    elif new_status_id == 5:  # Отказ (предполагаем, что ID=5 для отказа)
+    elif new_status_id == 3:  # Ожидает решения
+        notification_type = "waiting_for_decision"
+        message = f"Ожидайте решения по вакансии '{candidate.vacancy.title}'."
+    elif new_status_id == 5:  # Отказ
         notification_type = "rejection"
         message = f"К сожалению, ваша кандидатура на вакансию '{candidate.vacancy.title}' была отклонена. Благодарим за интерес к нашей компании."
-    elif new_status_id == 4:  # Предложение о работе (предполагаем, что ID=4 для предложения)
+    elif new_status_id == 4:  # Принят
         notification_type = "offer"
-        message = f"Поздравляем! Вам сделано предложение о работе на позицию '{candidate.vacancy.title}'. Ожидаем вашего ответа."
+        message = f"Поздравляем! Вы приняты на работу на позицию '{candidate.vacancy.title}'. Ожидаем вашего ответа."
     
     # Создаем новое уведомление
     notification = Notification(
         candidate_id=candidate.id,
         type=notification_type,
         message=message,
-        created_at=datetime.datetime.now()
+        created_at=datetime.now()
     )
     db.session.add(notification)
     
@@ -407,7 +439,7 @@ def download_resume(id):
         upload_folder, 
         filename, 
         as_attachment=True, 
-        download_name=f"resume_{candidate.full_name}_{datetime.datetime.now().strftime('%Y%m%d')}{os.path.splitext(filename)[1]}"
+        download_name=f"resume_{candidate.full_name}_{datetime.now().strftime('%Y%m%d')}{os.path.splitext(filename)[1]}"
     )
 
 @candidates_bp.route('/<int:id>/start_analysis', methods=['POST'])
@@ -656,4 +688,185 @@ def api_candidates():
             'ai_match_percent': candidate.ai_match_percent or 0
         })
     
-    return jsonify(result) 
+    return jsonify(result)
+
+@candidates_bp.route('/<int:id>/reprocess_resume', methods=['POST'])
+@profile_time
+@login_required
+def reprocess_resume(id):
+    """Повторная обработка резюме кандидата с использованием OpenAI API"""
+    # Получаем данные кандидата
+    candidate = Candidate.query.get_or_404(id)
+    vacancy = Vacancy.query.get(candidate.vacancy_id)
+    
+    # Проверка доступа для HR-менеджера
+    if current_user.role == 'hr' and vacancy.created_by != current_user.id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Нет доступа к данному кандидату'}), 403
+        flash('У вас нет доступа к данному кандидату', 'danger')
+        return redirect(url_for('candidates.list'))
+    
+    # Проверяем наличие резюме
+    if not candidate.resume_path or not os.path.exists(candidate.resume_path):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Резюме не найдено'}), 404
+        flash('Резюме не найдено', 'danger')
+        return redirect(url_for('candidates.view', id=id))
+    
+    try:
+        # Получаем API ключ из конфигурации или переменных окружения
+        api_key = current_app.config.get('OPENAI_API_KEY')
+        if not api_key:
+            api_key = os.environ.get('OPENAI_API_KEY')
+        
+        if not api_key or len(api_key.strip()) < 20:
+            raise ValueError("OpenAI API ключ не найден или некорректен")
+        
+        # Инициализируем клиент OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        # Определяем расширение файла
+        file_extension = os.path.splitext(candidate.resume_path)[1].lower()
+        
+        # Обработка в зависимости от типа файла
+        if file_extension == '.pdf':
+            current_app.logger.info(f"Обрабатываем PDF-файл: {candidate.resume_path}")
+            
+            # Открываем PDF с помощью PyMuPDF
+            pdf_document = fitz.open(candidate.resume_path)
+            
+            # Подготовка списка для хранения текста со всех страниц
+            all_pages_text = []
+            
+            # Для каждой страницы PDF
+            for page_num in range(len(pdf_document)):
+                # Получаем страницу
+                page = pdf_document[page_num]
+                
+                # Преобразуем страницу в изображение
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # Увеличиваем разрешение для лучшего распознавания
+                
+                # Конвертируем pixmap в формат, который можно отправить в OpenAI API
+                img_data = pix.tobytes("png")
+                
+                # Кодируем изображение в base64
+                img_base64 = base64.b64encode(img_data).decode('utf-8')
+                
+                # Отправляем запрос к OpenAI API для извлечения текста из изображения
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Ты специалист по распознаванию текста из документов. Извлеки весь текст из предоставленного изображения страницы резюме, сохраняя структуру и форматирование."
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": f"Это страница {page_num + 1} из {len(pdf_document)} резюме. Извлеки весь текст с этой страницы."
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{img_base64}"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens=4096
+                )
+                
+                # Извлекаем распознанный текст из ответа
+                page_text = response.choices[0].message.content
+                all_pages_text.append(page_text)
+            
+            # Закрываем документ
+            pdf_document.close()
+            
+            # Объединяем текст со всех страниц
+            resume_text = "\n\n".join(all_pages_text)
+            
+        elif file_extension in ['.jpg', '.jpeg', '.png']:
+            current_app.logger.info(f"Обрабатываем изображение: {candidate.resume_path}")
+            
+            # Для изображений используем прямую отправку в API
+            with open(candidate.resume_path, "rb") as file:
+                image_data = file.read()
+                img_base64 = base64.b64encode(image_data).decode('utf-8')
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Ты специалист по распознаванию текста из резюме. Извлеки весь текст из предоставленного изображения."
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Извлеки весь текст из этого резюме. Сохрани структуру и форматирование."
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/{file_extension[1:]};base64,{img_base64}"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens=4096
+                )
+                
+                resume_text = response.choices[0].message.content
+                
+        elif file_extension == '.docx':
+            current_app.logger.info(f"Обрабатываем DOCX-файл: {candidate.resume_path}")
+            
+            # Для DOCX используем python-docx для извлечения текста
+            try:
+                doc = docx.Document(candidate.resume_path)
+                paragraphs = [p.text for p in doc.paragraphs]
+                resume_text = "\n".join(paragraphs)
+                
+                # Если извлечено мало текста, можно конвертировать в изображение и использовать OpenAI
+                if len(resume_text) < 100:
+                    current_app.logger.warning("Извлечено мало текста из DOCX, попробуем другой подход")
+                    # Здесь можно добавить конвертацию DOCX в изображения, если это необходимо
+            except Exception as e:
+                current_app.logger.error(f"Ошибка при обработке DOCX: {str(e)}")
+                raise ValueError(f"Не удалось обработать DOCX-файл: {str(e)}")
+        else:
+            raise ValueError(f"Неподдерживаемый формат файла: {file_extension}")
+        
+        # Обновляем текст резюме в базе данных
+        candidate.resume_text = resume_text
+        candidate.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+        
+        current_app.logger.info(f"Текст резюме успешно обновлен с использованием OpenAI API")
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'status': 'success',
+                'message': 'Резюме успешно обработано с помощью OpenAI API',
+                'resume_text': resume_text
+            })
+        
+        flash('Резюме успешно обработано с помощью OpenAI API', 'success')
+        return redirect(url_for('candidates.view', id=id))
+            
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при обработке резюме через OpenAI API: {str(e)}", exc_info=True)
+        db.session.rollback()
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': f'Ошибка при обработке резюме: {str(e)}'}), 500
+        
+        flash(f'Ошибка при обработке резюме: {str(e)}', 'danger')
+        return redirect(url_for('candidates.view', id=id))

@@ -7,7 +7,7 @@ from app import db
 from app.models import Vacancy, Candidate, Notification, SystemLog
 from app.forms.application import ApplicationForm
 from app.utils.file_processing import save_resume, extract_text_from_resume
-from app.utils.ai_service import request_ai_analysis
+from app.utils.ai_service import request_ai_analysis, process_resume_and_analyze
 from app.utils.decorators import profile_time
 import uuid
 import os
@@ -17,6 +17,8 @@ from wtforms.validators import DataRequired, Optional
 from sqlalchemy import and_, func, cast
 import sqlalchemy as sa
 import json
+from threading import Thread
+from app import create_app
 
 public_bp = Blueprint('public_bp', __name__, url_prefix='')
 
@@ -93,6 +95,27 @@ def vacancy_detail(id):
         title=vacancy.title
     )
 
+def process_resume_async(candidate_id, resume_path):
+    """
+    Асинхронная обработка резюме
+    """
+    try:
+        # Создаем новый контекст приложения для асинхронной обработки
+        app = create_app()
+        
+        with app.app_context():
+            # Импортируем функцию внутри контекста приложения
+            from app.utils.ai_service import process_resume_and_analyze
+            
+            # Используем функцию для обработки резюме и запуска анализа
+            process_resume_and_analyze(candidate_id, resume_path)
+        
+    except Exception as e:
+        # Создаем контекст приложения для логирования ошибки
+        app = create_app()
+        with app.app_context():
+            app.logger.error(f"Ошибка при асинхронной обработке резюме: {str(e)}", exc_info=True)
+
 @public_bp.route('/apply/<int:vacancy_id>', methods=['GET', 'POST'])
 @profile_time
 def apply(vacancy_id):
@@ -100,73 +123,57 @@ def apply(vacancy_id):
     vacancy = Vacancy.query.get_or_404(vacancy_id)
     form = ApplicationForm()
     
-    # Проверяем, не подавал ли уже кандидат заявку с этим номером телефона
-    existing_application = Candidate.query.filter(
+    if form.validate_on_submit():
+        # Проверяем существующую заявку
+        existing_application = Candidate.query.filter(
         and_(
-            Candidate.vacancy_id == vacancy_id,
-            Candidate.phone == form.phone.data,
+                Candidate.vacancy_id == vacancy_id,
+            func.pgp_sym_decrypt(
+                cast(Candidate._phone, sa.LargeBinary),
+                current_app.config['ENCRYPTION_KEY'],
+                current_app.config.get('ENCRYPTION_OPTIONS', '')
+            ) == form.phone.data,
             Candidate.id_c_candidate_status != 3  # Разрешаем повторную подачу, если предыдущая была отклонена
         )
     ).first()
 
-    if existing_application:
-        flash('Вы уже подавали заявку на эту вакансию с этим номером телефона, пожалуйста, ждите ответа от HR-менеджера', 'warning')
-        return redirect(url_for('public_bp.vacancy', vacancy_id=vacancy_id))
+        if existing_application:
+            flash('Вы уже подавали заявку на эту вакансию с этим номером телефона, пожалуйста, ждите ответа от HR-менеджера', 'warning')
+            return redirect(url_for('public_bp.vacancy_detail', id=vacancy_id))
 
-    if form.validate_on_submit():
         try:
-            current_app.logger.info("Начинаем обработку формы")
             # Сохраняем базовую информацию
             tracking_code = str(uuid.uuid4())
             
-            # Обрабатываем ответы на профессиональные вопросы
+            # Обрабатываем ответы на вопросы
             vacancy_answers = {}
             if vacancy.questions_json:
                 for question in vacancy.questions_json:
                     question_id = str(question['id'])
                     field_name = f'vacancy_question_{question_id}'
-                    # Проверяем сначала в форме, потом напрямую в request.form
                     if hasattr(form, field_name) and getattr(form, field_name).data:
                         vacancy_answers[question_id] = getattr(form, field_name).data
                     elif field_name in request.form and request.form.get(field_name).strip():
                         vacancy_answers[question_id] = request.form.get(field_name).strip()
             
-            # Обрабатываем ответы на soft-skill вопросы
             soft_answers = {}
             if vacancy.soft_questions_json:
                 for question in vacancy.soft_questions_json:
                     question_id = str(question['id'])
                     field_name = f'soft_question_{question_id}'
-                    # Проверяем сначала в форме, потом напрямую в request.form
                     if hasattr(form, field_name) and getattr(form, field_name).data:
                         soft_answers[question_id] = getattr(form, field_name).data
                     elif field_name in request.form and request.form.get(field_name).strip():
                         soft_answers[question_id] = request.form.get(field_name).strip()
             
-            current_app.logger.info(f"Обработанные ответы: vacancy_answers={vacancy_answers}, soft_answers={soft_answers}")
-            
             # Обрабатываем загрузку резюме
             resume_path = None
-            resume_text = None
             if form.resume.data:
                 resume_file = form.resume.data
                 filename = save_resume(resume_file, tracking_code)
-                current_app.logger.info(f"Сохранено резюме: {filename}")
-                
                 if filename:
                     resume_path = filename
                     
-                    # Получаем расширение файла
-                    file_extension = os.path.splitext(filename)[1].lower()
-                    current_app.logger.info(f"Расширение файла резюме: {file_extension}")
-                    
-                    # Извлекаем текст из резюме для всех форматов
-                    resume_text = extract_text_from_resume(filename)
-                    current_app.logger.info(f"Извлеченный текст резюме: {str(resume_text)[:100] if resume_text else 'None'}")
-                    if not resume_text:
-                        resume_text = "Не удалось извлечь текст из резюме"
-                        current_app.logger.warning("Не удалось извлечь текст из резюме")
-            
             # Создаем базовые ответы
             base_answers = {
                 "location": form.location.data,
@@ -182,25 +189,22 @@ def apply(vacancy_id):
                 full_name=form.full_name.data,
                 email=form.email.data,
                 phone=form.phone.data,
-                base_answers=json.dumps(base_answers, ensure_ascii=False),
-                vacancy_answers=json.dumps(vacancy_answers, ensure_ascii=False),
-                soft_answers=json.dumps(soft_answers, ensure_ascii=False),
+                base_answers=base_answers,
+                vacancy_answers=vacancy_answers,
+                soft_answers=soft_answers,
                 cover_letter=form.cover_letter.data,
                 resume_path=resume_path,
-                resume_text=resume_text,
-                id_c_candidate_status=0,  # Статус "Новая заявка"
+                resume_text="{}",  # Пустой JSON для начала
+                id_c_candidate_status=0,
                 tracking_code=tracking_code,
                 gender=request.form.get('gender')
             )
             
-            current_app.logger.info(f"Создаем кандидата: {candidate.__dict__}")
-            
             # Сохраняем кандидата
             db.session.add(candidate)
             db.session.commit()
-            current_app.logger.info(f"Создан кандидат с ID: {candidate.id}")
             
-            # Создаем уведомление о новой заявке
+            # Создаем уведомление
             notification = Notification(
                 candidate_id=candidate.id,
                 type="application_received",
@@ -216,20 +220,16 @@ def apply(vacancy_id):
                 ip_address=request.remote_addr
             )
             
-            # Запускаем AI-анализ в фоновом режиме, если настроено
-            if resume_text and 'ai_analysis' in current_app.config.get('ENABLED_FEATURES', []):
-                try:
-                    current_app.logger.info(f"Запуск AI-анализа для кандидата {candidate.id}")
-                    request_ai_analysis(candidate)
-                    current_app.logger.info("AI-анализ успешно запущен")
-                except Exception as e:
-                    current_app.logger.error(f"Ошибка при запуске AI-анализа: {str(e)}", exc_info=True)
+            # Запускаем асинхронную обработку резюме и последующий AI-анализ
+            if resume_path:
+                thread = Thread(target=process_resume_and_analyze, args=(candidate.id, resume_path))
+                thread.daemon = True
+                thread.start()
             
             flash('Ваша заявка успешно отправлена! Используйте код отслеживания для проверки статуса.', 'success')
             return redirect(url_for('public_bp.application_success', tracking_code=tracking_code))
         
         except Exception as e:
-            # Откатываем транзакцию в случае ошибки
             db.session.rollback()
             current_app.logger.error(f"Ошибка при сохранении заявки: {str(e)}", exc_info=True)
             flash('Произошла ошибка при отправке заявки. Пожалуйста, попробуйте еще раз.', 'danger')

@@ -10,6 +10,15 @@ from flask_mail import Mail
 from flask_argon2 import Argon2
 from flask_wtf.csrf import CSRFProtect
 from config import config
+from logging.handlers import RotatingFileHandler
+from flask_caching import Cache
+import logging.config
+
+# Отключаем логирование SQLAlchemy на уровне модуля
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
 
 # Инициализация расширений
 db = SQLAlchemy()
@@ -19,6 +28,7 @@ jwt = JWTManager()
 mail = Mail()
 argon2 = Argon2()
 csrf = CSRFProtect()
+cache = Cache()
 
 def create_app(config_name='default'):
     app = Flask(__name__)
@@ -32,19 +42,7 @@ def create_app(config_name='default'):
     mail.init_app(app)
     argon2.init_app(app)
     csrf.init_app(app)
-    
-    # Настройка логирования
-    if not app.debug:
-        if not os.path.exists('logs'):
-            os.mkdir('logs')
-        file_handler = logging.FileHandler('logs/hr_manager.log')
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
-        app.logger.setLevel(logging.INFO)
-        app.logger.info('HR Manager startup')
+    cache.init_app(app)
     
     # Создание директории для загрузки файлов, если её нет
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -56,7 +54,7 @@ def create_app(config_name='default'):
     
     # Настройка login_manager
     login_manager.login_view = 'auth_bp.login'
-    login_manager.login_message = 'Пожалуйста, войдите в систему для доступа к этой странице.'
+    login_manager.login_message = 'Пожалуйста, войдите для доступа к этой странице.'
     
     @login_manager.user_loader
     def load_user(user_id):
@@ -70,6 +68,13 @@ def create_app(config_name='default'):
 
 # Настройка логирования
 def setup_logging(app):
+    # Удаляем все существующие обработчики из корневого логгера
+    # чтобы избежать дублирования логов
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+    
     # Формат логов
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
@@ -79,21 +84,45 @@ def setup_logging(app):
     console_handler.setLevel(logging.INFO)
     
     # Настройка корневого логгера
-    root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     root_logger.addHandler(console_handler)
     
-    # Настройка логгера Flask
+    # Очищаем обработчики логгера Flask
     app.logger.handlers.clear()
     app.logger.setLevel(logging.INFO)
+    app.logger.propagate = False  # Отключаем распространение логов в родительский логгер
     app.logger.addHandler(console_handler)
     
     # Отключаем логи от werkzeug ниже WARNING
     werkzeug_logger = logging.getLogger('werkzeug')
     werkzeug_logger.setLevel(logging.WARNING)
+    werkzeug_logger.propagate = False  # Отключаем распространение логов
     
     # Отключаем логи от SQLAlchemy ниже WARNING
     sa_logger = logging.getLogger('sqlalchemy')
-    sa_logger.setLevel(logging.WARNING)
+    sa_logger.setLevel(logging.ERROR)  # Повышаем уровень до ERROR
+    sa_logger.propagate = False  # Отключаем распространение логов
+    
+    # Полностью отключаем логи от SQLAlchemy Engine
+    sa_engine_logger = logging.getLogger('sqlalchemy.engine')
+    sa_engine_logger.setLevel(logging.ERROR)  # Устанавливаем уровень ERROR
+    sa_engine_logger.propagate = False  # Отключаем распространение логов
+    
+    # Отключаем логи от PostgreSQL
+    psycopg2_logger = logging.getLogger('psycopg2')
+    psycopg2_logger.setLevel(logging.WARNING)
+    psycopg2_logger.propagate = False  # Отключаем распространение логов
+    
+    psycopg2_pool_logger = logging.getLogger('psycopg2.pool')
+    psycopg2_pool_logger.setLevel(logging.WARNING)
+    psycopg2_pool_logger.propagate = False  # Отключаем распространение логов
+    
+    # Настройка логгеров для наших модулей
+    for logger_name in ['app.utils.image_processor', 'app.utils.handwriting_recognizer', 'app.utils.form_analyzer']:
+        module_logger = logging.getLogger(logger_name)
+        module_logger.handlers.clear()
+        module_logger.setLevel(logging.INFO)
+        module_logger.propagate = False  # Отключаем распространение логов
+        module_logger.addHandler(console_handler)
     
     return app

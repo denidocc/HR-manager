@@ -48,7 +48,7 @@ def save_resume(file, tracking_code):
     return file_path
 
 def extract_text_from_resume(file_path):
-    """Извлечение данных из файла резюме с использованием ResumeAnalyzer"""
+    """Извлечение данных из файла резюме с использованием AI-сервиса"""
     current_app.logger.info(f"Начало извлечения данных из файла: {file_path}")
     
     if not file_path or not os.path.exists(file_path):
@@ -56,25 +56,17 @@ def extract_text_from_resume(file_path):
         return None
     
     try:
-        # Используем ResumeAnalyzer для извлечения структурированных данных
-        from app.utils.resume_analyzer import ResumeAnalyzer
-        analyzer = ResumeAnalyzer()
-        extracted_data = analyzer.extract_data_from_resume(file_path)
+        # Используем функцию extract_resume_text из ai_service.py
+        from app.utils.ai_service import extract_resume_text
+        extracted_data = extract_resume_text(file_path)
         
         if not extracted_data:
             current_app.logger.error(f"Не удалось извлечь данные из файла: {file_path}")
             return None
-        
-        # Возвращаем только raw_text для совместимости со старым кодом,
-        # при этом сохраняем структурированные данные в отдельном поле
-        result = {
-            "text": extracted_data.get("raw_text", ""),
-            "structured_data": extracted_data,
-        }
-        
+            
         current_app.logger.info(f"Успешно извлечены данные из файла: {file_path}")
-        return result
+        return extracted_data
         
     except Exception as e:
         current_app.logger.error(f"Ошибка при извлечении данных из файла: {str(e)}", exc_info=True)
-        return None 
+        return None

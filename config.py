@@ -50,6 +50,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Отключаем логирование SQLAlchemy
+    SQLALCHEMY_ECHO = False
+    
     # Настройки шифрования для PostgreSQL pgp_sym_encrypt
     ENCRYPTION_KEY = get_env_variable('ENCRYPTION_KEY', 'pgp-encryption-key-replace-in-production')
     ENCRYPTION_OPTIONS = get_env_variable('ENCRYPTION_OPTIONS', 'cipher-algo=aes256')
@@ -84,6 +87,52 @@ class Config:
     # Настройки логирования
     LOG_LEVEL = get_env_variable('LOG_LEVEL', 'INFO')
     LOG_FILENAME = get_env_variable('LOG_FILENAME', 'app.log')
+
+    # Настройки логирования
+    LOGGING_CONFIG = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'default': {
+                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            }
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'default',
+                'level': 'INFO'
+            }
+        },
+        'loggers': {
+            '': {  # root logger
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': True
+            },
+            'sqlalchemy.engine': {
+                'handlers': [],
+                'level': 'WARNING',
+                'propagate': False
+            }
+        }
+    }
+    
+    # Настройки кэширования
+    CACHE_TYPE = 'simple'
+    CACHE_DEFAULT_TIMEOUT = 300
+    
+    # Настройки сессии
+    PERMANENT_SESSION_LIFETIME = timedelta(days=1)
+    
+    # Включенные функции
+    ENABLED_FEATURES = ['ai_analysis']
+
+    # Настройки для отключения логирования SQLAlchemy
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'echo': False,
+        'echo_pool': False
+    }
 
 class DevelopmentConfig(Config):
     DEBUG = True

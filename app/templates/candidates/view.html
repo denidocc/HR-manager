@@ -39,11 +39,11 @@
                         <dt class="col-sm-4">Телефон:</dt>
                         <dd class="col-sm-8">{{ candidate.phone }}</dd>
                         
-                        <dt class="col-sm-4">Статус:</dt>
+                        <dt class="col-sm-4">Этап отбора:</dt>
                         <dd class="col-sm-8">
-                            <span id="statusBadge" class="badge rounded-pill bg-secondary" 
-                                  data-color="{{ candidate.c_candidate_status.color_code if candidate.c_candidate_status else 'secondary' }}">
-                                {{ candidate.c_candidate_status.name if candidate.c_candidate_status else 'Заявка подана' }}
+                            <span id="statusBadge" class="badge rounded-pill" 
+                                  style="background-color: {{ candidate.selection_stage.color if candidate.selection_stage else 'secondary' }}">
+                                {{ candidate.selection_stage.name if candidate.selection_stage else 'Заявка подана' }}
                             </span>
                         </dd>
                         
@@ -56,30 +56,83 @@
                         <dd class="col-sm-8">{{ candidate.tracking_code }}</dd>
                     </dl>
                     
-                    <!-- Форма изменения статуса -->
+                    <!-- Форма изменения этапа отбора -->
                     <div class="mt-4">
-                        <h5>Изменить статус</h5>
+                        <h5>Изменить этап отбора</h5>
                         <form method="POST" action="{{ url_for('candidates.change_status', id=candidate.id) }}" class="row g-3">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="col-md-6">
-                                <select name="status_id" class="form-select" required>
-                                    {% for status in statuses %}
-                                    <option value="{{ status.id }}" {% if candidate.id_c_candidate_status == status.id %}selected{% endif %}>{{ status.name }}</option>
+                                <label for="stage-select" class="form-label">Этап отбора</label>
+                                <select name="stage_id" class="form-select" id="stage-select">
+                                    {% for stage in stages %}
+                                    <option value="{{ stage.id }}" {% if candidate.id_c_selection_stage == stage.id %}selected{% endif %}>{{ stage.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                             
-                            <div class="col-md-6" id="interviewDateContainer" style="display: none;">
-                                <input type="datetime-local" name="interview_date" class="form-control" 
-                                       {% if candidate.interview_date %}
-                                       value="{{ candidate.interview_date.strftime('%Y-%m-%dT%H:%M') }}"
-                                       {% endif %}>
+                            <!-- Выбор причины отклонения (показывается только при статусе "Отклонен") -->
+                            <div class="col-md-6" id="rejection-reason-container" style="display: none;">
+                                <label for="rejection_reason" class="form-label">Причина отклонения</label>
+                                <select class="form-select" id="rejection_reason" name="rejection_reason">
+                                    <option value="">Выберите причину отклонения</option>
+                                    {% for reason in rejection_reasons %}
+                                    <option value="{{ reason.id }}" {% if candidate.id_c_rejection_reason == reason.id %}selected{% endif %}>
+                                        {{ reason.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             
                             <div class="col-12">
-                                <button type="submit" class="btn btn-primary">Обновить статус</button>
+                                <button type="submit" class="btn btn-primary">Обновить этап отбора</button>
                             </div>
                         </form>
+                    </div>
+                    
+                    <!-- Отображение этапов отбора вакансии -->
+                    <div class="mt-4">
+                        <h5>Этапы отбора для вакансии</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div><strong>Новая заявка</strong></div>
+                                {% if candidate.id_c_selection_stage == 0 %}
+                                <span class="badge bg-primary rounded-pill">Текущий этап</span>
+                                {% endif %}
+                            </li>
+                            
+                            {% if candidate.vacancy and candidate.vacancy.selection_stages_json %}
+                                {% for stage in candidate.vacancy.selection_stages_json %}
+                                    {% set stage_index = loop.index %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ stage.name }}</strong>
+                                            <p class="mb-0 small text-muted">{{ stage.description }}</p>
+                                        </div>
+                                        {% if candidate.id_c_selection_stage == stage_index %}
+                                        <span class="badge bg-primary rounded-pill">Текущий этап</span>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            {% else %}
+                                <li class="list-group-item">
+                                    <div class="text-muted">Для этой вакансии не настроены индивидуальные этапы отбора</div>
+                                </li>
+                            {% endif %}
+                            
+                            <!-- Финальные статусы всегда показываем -->
+                            <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-success">
+                                <div><strong>Принят на работу</strong></div>
+                                {% if candidate.id_c_selection_stage == 4 %}
+                                <span class="badge bg-primary rounded-pill">Текущий этап</span>
+                                {% endif %}
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-danger">
+                                <div><strong>Отклонен</strong></div>
+                                {% if candidate.id_c_selection_stage == 5 %}
+                                <span class="badge bg-primary rounded-pill">Текущий этап</span>
+                                {% endif %}
+                            </li>
+                        </ul>
                     </div>
                     
                     <!-- Форма добавления комментария -->
@@ -575,7 +628,7 @@
         // Настройка статуса кандидата
         const statusBadge = document.getElementById('statusBadge');
         if (statusBadge) {
-            const colorCode = statusBadge.dataset.color;
+            const colorCode = statusBadge.style.backgroundColor;
             
             if (colorCode) {
                 // Проверяем формат цветового кода и преобразуем его при необходимости
@@ -610,7 +663,7 @@
         }
         
         // Поле даты интервью
-        const statusSelect = document.querySelector('select[name="status_id"]');
+        const statusSelect = document.querySelector('select[name="stage_id"]');
         const interviewDateContainer = document.getElementById('interviewDateContainer');
         
         // Проверяем начальное состояние

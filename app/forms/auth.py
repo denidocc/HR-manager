@@ -5,6 +5,14 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 from app.models.user import User
+import re
+
+# Валидатор для телефонных номеров
+def validate_phone(form, field):
+    """Проверяет, что номер телефона соответствует формату Туркменистана (+993XXXXXXXX)"""
+    phone_regex = re.compile(r'^\+993\d{8}$')
+    if not phone_regex.match(field.data):
+        raise ValidationError('Введите номер телефона в формате +993XXXXXXXX')
 
 class LoginForm(FlaskForm):
     """Форма для входа в систему"""
@@ -79,7 +87,8 @@ class PublicRegisterForm(FlaskForm):
     
     phone = StringField('Телефон', validators=[
         DataRequired(message='Введите ваш телефон'),
-        Length(min=10, max=20, message='Введите корректный номер телефона')
+        Length(min=10, max=20, message='Введите корректный номер телефона'),
+        validate_phone
     ])
     
     password = PasswordField('Пароль', validators=[

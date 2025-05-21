@@ -55,7 +55,7 @@
                         </div>
                         <div class="col-md-6">
                             <label for="phone" class="form-label">Телефон</label>
-                            {{ form.phone(class="form-control" + (" is-invalid" if form.phone.errors else ""), placeholder="Введите ваш номер телефона") }}
+                            {{ form.phone(class="form-control" + (" is-invalid" if form.phone.errors else ""), placeholder="+993XXXXXXXX") }}
                             {% if form.phone.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in form.phone.errors %}
@@ -63,6 +63,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
+                            <div class="form-text">Введите номер в формате +993XXXXXXXX</div>
                         </div>
                     </div>
                     

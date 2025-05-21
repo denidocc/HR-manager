@@ -161,8 +161,8 @@
                                     <td>{{ candidate.full_name }}</td>
                                     <td>{{ candidate.vacancy.title if candidate.vacancy else 'Не указана' }}</td>
                                     <td>
-                                        <span class="badge text-white" data-color="{{ candidate.c_candidate_status.color_code }}">
-                                            {{ candidate.c_candidate_status.name }}
+                                        <span class="badge text-white" data-color="{{ candidate.selection_stage.color }}">
+                                            {{ candidate.selection_stage.name }}
                                         </span>
                                     </td>
                                     <td>{{ candidate.created_at.strftime('%d.%m.%Y') }}</td>

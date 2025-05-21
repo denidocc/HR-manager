@@ -7,7 +7,6 @@ from app.models.system_log import SystemLog
 from app.models.c_gender import C_Gender
 from app.models.c_education import C_Education
 from app.models.c_user_status import C_User_Status
-from app.models.c_candidate_status import C_Candidate_Status
 from app.models.c_employment_type import C_Employment_Type
 from app.models.skill_category import SkillCategory
 from app.models.skill import Skill
@@ -17,3 +16,4 @@ from app.models.industry import Industry
 from app.models.vacancy_industry import VacancyIndustry 
 from app.models.keyword import Keyword
 from app.models.keyword_category import KeywordCategory 
+from app.models.c_selection_stage import C_Selection_Stage 

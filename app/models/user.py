@@ -4,6 +4,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm as so
 from app import db, login_manager, argon2
 from app.utils.encryption import encrypted_property
+from app.models.c_selection_stage import user_selection_stages
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -32,6 +33,7 @@ class User(UserMixin, db.Model):
     c_user_status = so.relationship('C_User_Status', back_populates='users')
     created_vacancies = so.relationship('Vacancy', back_populates='creator')
     system_logs = so.relationship('SystemLog', back_populates='user')
+    selection_stages = so.relationship('C_Selection_Stage', secondary=user_selection_stages, back_populates='users')
     
     def __repr__(self):
         return f'<User {self._email}>'
@@ -42,11 +44,31 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return argon2.check_password_hash(self.password_hash, password)
     
+    @property
     def is_hr(self):
         return self.role == 'hr'
     
+    @property
     def is_candidate(self):
         return self.role == 'candidate'
+    
+    def get_selection_stages(self):
+        """Получает этапы отбора пользователя, или стандартные если у него их нет"""
+        from app.models.c_selection_stage import C_Selection_Stage
+        
+        if self.selection_stages:
+            return sorted(self.selection_stages, key=lambda stage: stage.order)
+        
+        # Если у пользователя нет собственных этапов, возвращаем стандартные
+        return C_Selection_Stage.query.filter_by(is_default=True).order_by(C_Selection_Stage.order).all()
+    
+    def initialize_default_stages(self):
+        """Инициализирует стандартные этапы отбора для нового пользователя"""
+        from app.models.c_selection_stage import C_Selection_Stage
+        
+        if not self.selection_stages:
+            default_stages = C_Selection_Stage.query.filter_by(is_default=True).order_by(C_Selection_Stage.order).all()
+            self.selection_stages = default_stages
     
     def to_dict(self):
         return {

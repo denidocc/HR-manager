@@ -15,9 +15,10 @@ class CandidateCommentForm(FlaskForm):
 
 class CandidateStatusForm(FlaskForm):
     """Форма для изменения статуса кандидата"""
-    id_c_candidate_status = SelectField('Статус', 
-        validators=[DataRequired(message='Выберите статус')], 
-        coerce=int
+    id_c_selection_stage = SelectField('Этап отбора',
+        coerce=int,
+        validators=[DataRequired()],
+        render_kw={"class": "form-select"}
     )
     interview_date = DateTimeField('Дата собеседования', 
         format='%Y-%m-%dT%H:%M', 

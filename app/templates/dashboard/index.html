@@ -106,8 +106,8 @@
                                     <td>{{ candidate.vacancy.title }}</td>
                                     <td>{{ candidate.created_at.strftime('%d.%m.%Y') }}</td>
                                     <td>
-                                        <span class="badge" style="background-color: {{ candidate.c_candidate_status.color_code }}">
-                                            {{ candidate.c_candidate_status.name }}
+                                        <span class="badge" style="background-color: {{ candidate.selection_stage.color }}">
+                                            {{ candidate.selection_stage.name }}
                                         </span>
                                     </td>
                                 </tr>

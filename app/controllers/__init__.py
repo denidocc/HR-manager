@@ -10,6 +10,7 @@ from app.controllers.files import files_bp
 from app.controllers.ai_analysis import ai_analysis_bp
 from app.controllers.public import public_bp
 from app.controllers.index import index_bp
+from app.controllers.settings import settings_bp
 
 # Список всех blueprints
 blueprints = [
@@ -20,7 +21,8 @@ blueprints = [
     candidates_bp,
     files_bp,
     ai_analysis_bp,
-    public_bp
+    public_bp,
+    settings_bp,
 ]
 
 def register_blueprints(app):

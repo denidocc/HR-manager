@@ -4,10 +4,10 @@
 from flask import Blueprint, render_template, jsonify, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db, cache
-from app.models import Vacancy, Candidate, C_Candidate_Status, Notification, SystemLog, User, C_User_Status, Skill, SkillCategory, CandidateSkill, VacancySkill, Industry, VacancyIndustry
+from app.models import Vacancy, Candidate, C_Candidate_Status, Notification, SystemLog, User, C_User_Status, Skill, SkillCategory, CandidateSkill, VacancySkill, Industry, VacancyIndustry, C_Selection_Stage
 from app.controllers.auth import admin_required, hr_required
 from sqlalchemy import func, desc, and_, cast, case
-import datetime
+from datetime import datetime, timezone
 import sqlalchemy as sa
 from flask import current_app
 import pandas as pd
@@ -1172,4 +1172,172 @@ def seasonal_trends():
     except Exception as e:
         current_app.logger.error(f"Ошибка при анализе сезонных трендов: {str(e)}")
         flash(f"Ошибка при анализе сезонных трендов: {str(e)}", "danger")
-        return redirect(url_for('dashboard.statistics')) 
+        return redirect(url_for('dashboard.statistics'))
+
+@dashboard_bp.route('/api/kanban/update-status', methods=['POST'])
+@profile_time
+@login_required
+@hr_required
+def update_kanban_status():
+    """API-метод для обновления статуса кандидата при перетаскивании"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'candidate_id' not in data or 'status_id' not in data:
+            return jsonify({'status': 'error', 'message': 'Недостаточно данных для обновления'}), 400
+        
+        candidate_id = data['candidate_id']
+        new_status_id = data['status_id']
+        
+        # Проверяем существование кандидата и статуса
+        candidate = Candidate.query.get(candidate_id)
+        status = C_Selection_Stage.query.get(new_status_id)
+        
+        if not candidate:
+            return jsonify({'status': 'error', 'message': 'Кандидат не найден'}), 404
+            
+        if not status:
+            return jsonify({'status': 'error', 'message': 'Статус не найден'}), 404
+            
+        # Проверяем, принадлежит ли вакансия текущему пользователю
+        if candidate.vacancy.created_by != current_user.id:
+            return jsonify({'status': 'error', 'message': 'У вас нет доступа к этому кандидату'}), 403
+            
+        # Обновляем статус кандидата
+        old_status = candidate.id_c_candidate_status
+        candidate.id_c_candidate_status = new_status_id
+        candidate.updated_at = datetime.now(timezone.utc)
+        
+        # Добавляем комментарий о смене статуса, если предоставлен
+        if 'comment' in data and data['comment'].strip():
+            comment = data['comment'].strip()
+            
+            # Если уже есть комментарий, добавляем новый
+            if candidate.hr_comment:
+                candidate.hr_comment = f"{candidate.hr_comment}\n\n[{datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M')}] Смена статуса на \"{status.name}\": {comment}"
+            else:
+                candidate.hr_comment = f"[{datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M')}] Смена статуса на \"{status.name}\": {comment}"
+        
+        db.session.commit()
+        
+        # Создаем уведомление о смене статуса
+        notification = Notification(
+            candidate_id=candidate.id,
+            type="status_update",
+            message=f"Статус вашей заявки на вакансию '{candidate.vacancy.title}' изменен на '{status.name}'."
+        )
+        db.session.add(notification)
+        db.session.commit()
+        
+        # Логирование
+        SystemLog.log(
+            event_type="candidate_status_change",
+            description=f"Изменен статус кандидата ID={candidate_id}: {candidate.full_name} с {old_status} на {new_status_id}",
+            user_id=current_user.id,
+            ip_address=request.remote_addr
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Статус кандидата успешно обновлен',
+            'candidate_id': candidate_id,
+            'status_id': new_status_id,
+            'status_name': status.name,
+            'updated_at': candidate.updated_at.isoformat()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при обновлении статуса кандидата: {str(e)}")
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': f'Произошла ошибка: {str(e)}'}), 500
+
+@dashboard_bp.route('/kanban')
+@profile_time
+@login_required
+@hr_required
+def kanban():
+    """Канбан-доска кандидатов для HR-менеджера"""
+    # Получаем вакансии HR-менеджера для фильтра
+    vacancies = Vacancy.query.filter_by(created_by=current_user.id).all()
+    
+    # Получаем параметры фильтрации
+    vacancy_id = request.args.get('vacancy_id', type=int)
+    
+    # Получаем этапы отбора
+    selection_stages = C_Selection_Stage.query.order_by(C_Selection_Stage.order.asc()).all()
+    
+    # Базовый запрос кандидатов
+    candidates_query = db.session.query(
+        Candidate.id,
+        Candidate.full_name,
+        Candidate.vacancy_id,
+        Candidate.id_c_candidate_status,
+        Candidate.resume_path,
+        Candidate.ai_match_percent,
+        Candidate.created_at,
+        Candidate.updated_at,
+        func.pgp_sym_decrypt(
+            cast(Candidate._email, sa.LargeBinary),
+            current_app.config['ENCRYPTION_KEY'],
+            current_app.config.get('ENCRYPTION_OPTIONS', '')
+        ).label('email'),
+        func.pgp_sym_decrypt(
+            cast(Candidate._phone, sa.LargeBinary),
+            current_app.config['ENCRYPTION_KEY'],
+            current_app.config.get('ENCRYPTION_OPTIONS', '')
+        ).label('phone'),
+        Vacancy.title.label('vacancy_title'),
+        C_Candidate_Status.name.label('status_name'),
+        C_Candidate_Status.color_code.label('status_color')
+    ).join(
+        Vacancy, Candidate.vacancy_id == Vacancy.id
+    ).join(
+        C_Candidate_Status, Candidate.id_c_candidate_status == C_Candidate_Status.id
+    ).filter(
+        Vacancy.created_by == current_user.id
+    )
+    
+    # Применяем фильтр по вакансии, если указан
+    if vacancy_id:
+        candidates_query = candidates_query.filter(Candidate.vacancy_id == vacancy_id)
+    
+    # Получаем и группируем кандидатов по статусам
+    candidates = candidates_query.order_by(Candidate.updated_at.desc()).all()
+    
+    # Группировка кандидатов по статусам для канбан-доски
+    kanban_data = {}
+    for stage in selection_stages:
+        kanban_data[stage.id] = {
+            'name': stage.name,
+            'description': stage.description,
+            'color': stage.color,
+            'candidates': []
+        }
+    
+    # Заполняем канбан данными о кандидатах
+    for candidate in candidates:
+        status_id = candidate.id_c_candidate_status
+        if status_id in kanban_data:
+            candidate_data = {
+                'id': candidate.id,
+                'name': candidate.full_name,
+                'email': candidate.email,
+                'phone': candidate.phone,
+                'vacancy_id': candidate.vacancy_id,
+                'vacancy_title': candidate.vacancy_title,
+                'ai_match_percent': candidate.ai_match_percent,
+                'created_at': candidate.created_at,
+                'resume_path': candidate.resume_path,
+                'status_name': candidate.status_name,
+                'status_color': candidate.status_color
+            }
+            kanban_data[status_id]['candidates'].append(candidate_data)
+    
+    return render_template(
+        'dashboard/kanban.html',
+        kanban_data=kanban_data,
+        vacancies=vacancies,
+        vacancy_id=vacancy_id,
+        selection_stages=selection_stages,
+        title='Канбан кандидатов'
+    )

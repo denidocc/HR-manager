@@ -286,11 +286,21 @@ def track_result():
 @profile_time
 def candidate_status(tracking_code):
     """Страница статуса заявки кандидата"""
+    # Получаем кандидата с расшифрованными полями и информацией о вакансии
     candidate = Candidate.query.filter_by(tracking_code=tracking_code).first_or_404()
+    
+    # Загружаем вакансию с этапами отбора
+    vacancy = Vacancy.query.get_or_404(candidate.vacancy_id)
+    
+    # Если у вакансии нет определенных этапов отбора, используем стандартные
+    if not vacancy.selection_stages_json:
+        # Можно здесь создать стандартные этапы для отображения
+        pass
     
     return render_template(
         'public/candidate_status.html',
         candidate=candidate,
+        vacancy=vacancy,
         title='Статус заявки'
     )
 

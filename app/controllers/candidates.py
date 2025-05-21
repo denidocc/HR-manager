@@ -175,9 +175,13 @@ def view(id):
             current_app.config.get('ENCRYPTION_OPTIONS', '')
         ).label('phone'),
         Candidate.id_c_selection_stage,
-        Vacancy.title.label('vacancy_title')
+        Vacancy.title.label('vacancy_title'),
+        C_Selection_Stage.name.label('status_name'),
+        C_Selection_Stage.color.label('status_color')
     ).join(
         Vacancy, Candidate.vacancy_id == Vacancy.id
+    ).join(
+        C_Selection_Stage, Candidate.id_c_selection_stage == C_Selection_Stage.id
     ).filter(Candidate.id == id).first_or_404()
     
     # Получаем обычную модель кандидата для связей
@@ -254,7 +258,10 @@ def view(id):
         'created_at': candidate_data.created_at,
         'updated_at': candidate_data.updated_at,
         'tracking_code': candidate_data.tracking_code,
-        'selection_stage': stage,
+        'selection_stage': {
+            'name': candidate_data.status_name,
+            'color': candidate_data.status_color
+        },
         'id_c_selection_stage': candidate_data.id_c_selection_stage,
         'id_c_rejection_reason': candidate_data.id_c_rejection_reason,
         'notifications': candidate.notifications  # Берем из оригинальной модели
@@ -551,7 +558,7 @@ def track(tracking_code):
         ).label('phone'),
         Vacancy.title.label('vacancy_title'),
         C_Selection_Stage.name.label('status_name'),
-        C_Selection_Stage.color_code.label('status_color')
+        C_Selection_Stage.color.label('status_color')
     ).join(
         Vacancy, Candidate.vacancy_id == Vacancy.id
     ).join(
@@ -579,9 +586,9 @@ def track(tracking_code):
         'id_c_selection_stage': candidate_data.id_c_selection_stage,
         'interview_date': candidate_data.interview_date,
         'created_at': candidate_data.created_at,
-        'c_candidate_status': {
+        'selection_stage': {
             'name': candidate_data.status_name,
-            'color_code': candidate_data.status_color
+            'color': candidate_data.status_color
         },
         'notifications': candidate.notifications
     }
@@ -620,7 +627,7 @@ def api_candidates():
         Candidate.id_c_selection_stage,
         Vacancy.title.label('vacancy_title'),
         C_Selection_Stage.name.label('status_name'),
-        C_Selection_Stage.color_code.label('status_color')
+        C_Selection_Stage.color.label('status_color')
     ).join(
         Vacancy, Candidate.vacancy_id == Vacancy.id
     ).join(

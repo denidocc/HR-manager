@@ -18,7 +18,7 @@ class C_Rejection_Reason(db.Model):
     order: so.Mapped[int] = so.mapped_column(sa.Integer, default=0)
     
     # Добавляем обратную связь с кандидатами
-    candidates: so.Mapped[list["Candidate"]] = so.relationship(back_populates="rejection_reason")
+    candidates: so.Mapped[list["Candidate"]] = so.relationship(back_populates="c_rejection_reason")
     
     def __repr__(self):
         return f'<C_Rejection_Reason {self.name}>' 

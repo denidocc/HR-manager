@@ -427,8 +427,8 @@ def candidates(id):
     query = Candidate.query.filter_by(vacancy_id=vacancy.id)
     
     # Фильтрация по статусу
-    if status_filter != 'all':
-        query = query.filter_by(id_c_candidate_status=status_filter)
+    if status_filter is not None:
+        query = query.filter_by(id_c_selection_stage=status_filter)
     
     # Сортировка
     if sort_by == 'date':

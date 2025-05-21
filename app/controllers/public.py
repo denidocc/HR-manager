@@ -133,7 +133,7 @@ def apply(vacancy_id):
                 current_app.config['ENCRYPTION_KEY'],
                 current_app.config.get('ENCRYPTION_OPTIONS', '')
             ) == form.phone.data,
-            Candidate.id_c_candidate_status != 3  # Разрешаем повторную подачу, если предыдущая была отклонена
+            Candidate.id_c_selection_stage != 3  # Разрешаем повторную подачу, если предыдущая была отклонена
         )
     ).first()
 
@@ -195,7 +195,7 @@ def apply(vacancy_id):
                 cover_letter=form.cover_letter.data,
                 resume_path=resume_path,
                 resume_text="{}",  # Пустой JSON для начала
-                id_c_candidate_status=0,
+                id_c_selection_stage=0,  # Начальный этап отбора
                 tracking_code=tracking_code,
                 gender=request.form.get('gender')
             )

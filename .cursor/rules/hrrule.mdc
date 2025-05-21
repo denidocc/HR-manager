@@ -3,7 +3,6 @@ description:
 globs: 
 alwaysApply: true
 ---
-Search files...
 # Правила структурирования проекта Flask с PostgreSQL
 
 # Название проекта: Clever HR

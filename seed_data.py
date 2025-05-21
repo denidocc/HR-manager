@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from faker import Faker
 from app import create_app, db
 from app.models import User, Vacancy, Candidate, Notification, SystemLog
-from app.models import C_Gender, C_User_Status, C_Candidate_Status, C_Employment_Type, C_Education
+from app.models import C_Gender, C_User_Status, C_Selection_Stage, C_Employment_Type, C_Education
 from tqdm import tqdm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -98,28 +98,29 @@ def create_c_user_status():
         db.session.rollback()
         print(f"Ошибка при обновлении справочника статусов пользователей: {e}")
 
-def create_c_candidate_status():
-    """Создание справочника статусов кандидатов"""
-    statuses = [
-        {'name': 'Заявка подана', 'description': 'Кандидат только что подал заявку', 'color_code': '#3498db'},
-        {'name': 'Рассмотрение резюме', 'description': 'Резюме кандидата находится на рассмотрении', 'color_code': '#17a2b8'},
-        {'name': 'Назначено интервью', 'description': 'Кандидату назначено собеседование', 'color_code': '#f39c12'},
-        {'name': 'Ожидает решения', 'description': 'Кандидат ожидает решения после интервью', 'color_code': '#9b59b6'},
-        {'name': 'Принят', 'description': 'Кандидат принят на работу', 'color_code': '#2ecc71'},
-        {'name': 'Отклонен', 'description': 'Кандидат не прошел отбор', 'color_code': '#e74c3c'}
+def create_c_selection_stage():
+    """Создание справочника этапов отбора"""
+    stages = [
+        {'name': 'Заявка подана', 'description': 'Кандидат только что подал заявку', 'color': '#3498db', 'order': 1},
+        {'name': 'Рассмотрение резюме', 'description': 'Резюме кандидата находится на рассмотрении', 'color': '#17a2b8', 'order': 2},
+        {'name': 'Назначено интервью', 'description': 'Кандидату назначено собеседование', 'color': '#f39c12', 'order': 3},
+        {'name': 'Ожидает решения', 'description': 'Кандидат ожидает решения после интервью', 'color': '#9b59b6', 'order': 4},
+        {'name': 'Принят', 'description': 'Кандидат принят на работу', 'color': '#2ecc71', 'order': 5},
+        {'name': 'Отклонен', 'description': 'Кандидат не прошел отбор', 'color': '#e74c3c', 'order': 6}
     ]
-    for i, status in enumerate(statuses):
-        existing = C_Candidate_Status.query.filter_by(name=status['name']).first()
+    for i, stage in enumerate(stages):
+        existing = C_Selection_Stage.query.filter_by(name=stage['name']).first()
         if not existing:
-            new_status = C_Candidate_Status(
+            new_stage = C_Selection_Stage(
                 id=i,
-                name=status['name'],
-                description=status['description'],
-                color_code=status['color_code']
+                name=stage['name'],
+                description=stage['description'],
+                color=stage['color'],
+                order=stage['order']
             )
-            db.session.add(new_status)
+            db.session.add(new_stage)
     db.session.commit()
-    print("Справочник статусов кандидатов успешно создан")
+    print("Справочник этапов отбора успешно создан")
 
 def create_c_employment_type():
     """Создание справочника типов занятости"""
@@ -197,98 +198,40 @@ def create_candidates(num_candidates=20):
         print("Нет вакансий для кандидатов. Сначала создайте вакансии.")
         return
     
+    # Получаем все этапы отбора
+    stages = C_Selection_Stage.query.all()
+    if not stages:
+        print("Нет этапов отбора. Сначала создайте этапы отбора.")
+        return
+    
     existing_count = Candidate.query.count()
     if existing_count >= num_candidates:
         print(f"Уже существует {existing_count} кандидатов. Пропускаем создание.")
         return
     
-    statuses = C_Candidate_Status.query.all()
-    
     for _ in tqdm(range(num_candidates - existing_count), desc="Создание кандидатов"):
         vacancy = random.choice(vacancies)
-        
-        # Генерируем базовые ответы на вопросы
-        base_answers = {
-            "location": fake.city(),
-            "experience_years": random.randint(0, 10),
-            "education": random.choice(["Среднее", "Высшее", "Специальное"]),
-            "desired_salary": random.randint(30000, 150000)
-        }
-        
-        # Генерируем ответы на вопросы вакансии
-        vacancy_answers = {}
-        if vacancy.questions_json:
-            for question in vacancy.questions_json:
-                vacancy_answers[question['id']] = fake.paragraph()
-        
-        # Генерируем ответы на софт-скилл вопросы
-        soft_answers = {}
-        if vacancy.soft_questions_json:
-            for question in vacancy.soft_questions_json:
-                soft_answers[question['id']] = fake.paragraph()
-        
-        # Генерируем данные AI-анализа
-        ai_match_percent = random.randint(40, 95)
-        ai_pros = "\n".join([f"+ {fake.sentence()}" for _ in range(random.randint(2, 5))])
-        ai_cons = "\n".join([f"- {fake.sentence()}" for _ in range(random.randint(1, 3))])
-        ai_recommendation = random.choice([
-            "Рекомендуется к собеседованию",
-            "Условно рекомендуется, требуется дополнительная проверка",
-            "Не рекомендуется, недостаточно опыта",
-            "Высокий приоритет, полное соответствие требованиям"
-        ])
-        
-        # Сгенерируем баллы для разных категорий
-        ai_score_location = random.randint(0, 100)
-        ai_score_experience = random.randint(0, 100)
-        ai_score_tech = random.randint(0, 100)
-        ai_score_education = random.randint(0, 100)
-        
-        # И комментарии к оценкам
-        ai_score_comments = {
-            "location": fake.paragraph(),
-            "experience": fake.paragraph(),
-            "tech": fake.paragraph(),
-            "education": fake.paragraph()
-        }
-        
-        # Определяем статус кандидата
-        status = random.choice(statuses)
-        
-        # Если статус "Назначено интервью", генерируем дату интервью
-        interview_date = None
-        if status.name == "Назначено интервью":
-            interview_date = fake.date_time_between(start_date='now', end_date='+30d', tzinfo=timezone.utc)
+        stage = random.choice(stages)
         
         candidate = Candidate(
             vacancy_id=vacancy.id,
             full_name=fake.name(),
             email=fake.email(),
             phone=fake.phone_number(),
-            base_answers=base_answers,
-            vacancy_answers=vacancy_answers,
-            soft_answers=soft_answers,
-            resume_path=None,  # В реальности здесь был бы путь к загруженному резюме
-            resume_text=fake.text(max_nb_chars=1000),
-            ai_match_percent=ai_match_percent,
-            ai_pros=ai_pros,
-            ai_cons=ai_cons,
-            ai_recommendation=ai_recommendation,
-            ai_score_location=ai_score_location,
-            ai_score_experience=ai_score_experience,
-            ai_score_tech=ai_score_tech,
-            ai_score_education=ai_score_education,
-            ai_score_comments_location=ai_score_comments["location"],
-            ai_score_comments_experience=ai_score_comments["experience"],
-            ai_score_comments_tech=ai_score_comments["tech"],
-            ai_score_comments_education=ai_score_comments["education"],
-            id_c_candidate_status=status.id,
-            interview_date=interview_date,
-            hr_comment=fake.paragraph() if random.choice([True, False]) else None,
-            created_at=fake.date_time_between(start_date='-30d', end_date='now', tzinfo=timezone.utc),
-            tracking_code=str(uuid.uuid4())
+            base_answers={
+                "location": random.choice(["Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург"]),
+                "experience_years": random.randint(0, 15),
+                "education": random.choice(["Высшее", "Среднее специальное", "Среднее"]),
+                "desired_salary": random.randint(50000, 300000),
+                "gender": random.choice(["М", "Ж"])
+            },
+            vacancy_answers={},
+            soft_answers={},
+            cover_letter=fake.text(max_nb_chars=500),
+            id_c_selection_stage=stage.id,
+            tracking_code=str(uuid.uuid4()),
+            created_at=fake.date_time_between(start_date='-1y', end_date='now', tzinfo=timezone.utc)
         )
-        
         db.session.add(candidate)
     
     db.session.commit()
@@ -391,7 +334,7 @@ def create_notifications(num_notifications=50):
         if notification_type == "application_received":
             message = f"Ваша заявка на вакансию '{candidate.vacancy.title}' принята. Мы свяжемся с вами после рассмотрения."
         elif notification_type == "status_update":
-            message = f"Статус вашей заявки на вакансию '{candidate.vacancy.title}' изменен на '{candidate.c_candidate_status.name}'."
+            message = f"Статус вашей заявки на вакансию '{candidate.vacancy.title}' изменен на '{candidate.selection_stage.name}'."
         elif notification_type == "interview_invitation":
             date = fake.date_time_between(start_date='+1d', end_date='+14d', tzinfo=timezone.utc)
             message = f"Приглашаем вас на собеседование по вакансии '{candidate.vacancy.title}'. Дата: {date.strftime('%d.%m.%Y %H:%M')}."
@@ -484,22 +427,27 @@ def main():
     """Основная функция для заполнения базы данных тестовыми данными"""
     print("Начало заполнения базы данных...")
     
-    # Создание справочников
+    # Создаем справочники
     create_c_gender()
-    create_c_user_status()
-    create_c_candidate_status()
-    create_c_employment_type()
     create_c_education()
-    # Создание пользователей
+    create_c_user_status()
+    create_c_selection_stage()
+    create_c_employment_type()
+    
+    # Создаем пользователей
     create_admin_user()
     create_hr_users(5)
     
-    # Создание вакансий и кандидатов
+    # Создаем вакансии
     create_vacancies(10)
+    
+    # Создаем кандидатов
     create_candidates(30)
     
-    # Создание уведомлений и логов
+    # Создаем уведомления
     create_notifications(50)
+    
+    # Создаем системные логи
     create_system_logs(100)
     
     print("База данных успешно заполнена тестовыми данными!")

@@ -62,7 +62,7 @@ def create():
     # Заполняем select с типами занятости
     form.id_c_employment_type.choices = [
         ('', 'Выберите тип занятости')
-    ] + [(t.id, t.name) for t in C_Employment_Type.query.all()]
+    ] + [(t.id, t.name) for t in C_Employment_Type.query.all() if t.id != 0]
     
     if request.method == 'POST':
         logger.info("Получен POST-запрос для создания вакансии")
@@ -193,7 +193,7 @@ def edit(id):
     # Заполняем select с типами занятости
     form.id_c_employment_type.choices = [
         ('', 'Выберите тип занятости')
-    ] + [(t.id, t.name) for t in C_Employment_Type.query.all()]
+    ] + [(t.id, t.name) for t in C_Employment_Type.query.all() if t.id != 0]
     
     # При GET запросе подготавливаем форму с существующими данными
     if request.method == 'GET':
@@ -506,9 +506,21 @@ def generate_with_ai():
     try:
         # Получаем данные из формы
         title = request.form.get('title')
-        id_c_employment_type = int(request.form.get('id_c_employment_type'))
+        id_c_employment_type_str = request.form.get('id_c_employment_type')
         description_tasks = request.form.get('description_tasks')
         description_conditions = request.form.get('description_conditions')
+        
+        # Проверяем, что id_c_employment_type не пустой
+        if not id_c_employment_type_str:
+            logger.error(f"Пустой тип занятости: {id_c_employment_type_str}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Выберите корректный тип занятости.',
+                'errors': {'id_c_employment_type': ['Выберите тип занятости']}
+            }), 400
+        
+        # Преобразуем в int только если прошли валидацию
+        id_c_employment_type = int(id_c_employment_type_str)
         
         # Получаем тип занятости
         employment_type = C_Employment_Type.query.get(id_c_employment_type)
@@ -627,4 +639,4 @@ def get_default_stages():
         {"name": "Предложение", "description": "Кандидату сделано предложение"}
     ]
     
-    return jsonify(default_stages) 
+    return jsonify(default_stages)

@@ -145,19 +145,19 @@ def selection_stages():
                             color=stage_data.get('color', '#6c757d'),
                             order=i + 1,
                             is_active=stage_data.get('is_active', True),
-                            is_default=False
+                            type='user'
                         )
                         db.session.add(stage)
                     else:
                         # Если этап стандартный (is_default=True), создаем его копию
-                        if stage.is_default:
+                        if stage.type == 'standard':
                             new_stage = C_Selection_Stage(
                                 name=stage_data['name'],
                                 description=stage_data.get('description', ''),
                                 color=stage_data.get('color', '#6c757d'),
                                 order=i + 1,
                                 is_active=stage_data.get('is_active', True),
-                                is_default=False
+                                type='user'
                             )
                             db.session.add(new_stage)
                             stage = new_stage
@@ -169,7 +169,7 @@ def selection_stages():
                         color=stage_data.get('color', '#6c757d'),
                         order=i + 1,
                         is_active=stage_data.get('is_active', True),
-                        is_default=False
+                        type='user'
                     )
                     db.session.add(stage)
                 
@@ -216,7 +216,7 @@ def api_reset_selection_stages():
         current_user.selection_stages = []
         
         # Загружаем стандартные этапы
-        default_stages = C_Selection_Stage.query.filter_by(is_default=True).order_by(C_Selection_Stage.order).all()
+        default_stages = C_Selection_Stage.query.filter_by(type='standard').order_by(C_Selection_Stage.order).all()
         
         # Устанавливаем стандартные этапы для текущего пользователя
         current_user.selection_stages = default_stages

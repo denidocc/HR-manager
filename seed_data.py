@@ -97,7 +97,6 @@ def create_c_user_status():
     except Exception as e:
         db.session.rollback()
         print(f"Ошибка при обновлении справочника статусов пользователей: {e}")
-
 def create_c_selection_stage():
     """Создание справочника этапов отбора"""
     stages = [
@@ -125,11 +124,12 @@ def create_c_selection_stage():
 def create_c_employment_type():
     """Создание справочника типов занятости"""
     employment_types = [
-        {'name': 'Полный день', 'description': 'Работа с 9 до 18'},
-        {'name': 'Неполный день', 'description': 'Частичная занятость'},
-        {'name': 'Удаленно', 'description': 'Работа из дома'},
-        {'name': 'Гибкий график', 'description': 'Свободный график работы'},
-        {'name': 'Сменный график', 'description': 'Работа по сменам'}
+        {'id': 0, 'name': 'Неизвестно', 'description': 'Статус не определен'},
+        {'id': 1, 'name': 'Полный день', 'description': 'Работа с 9 до 18'},
+        {'id': 2, 'name': 'Неполный день', 'description': 'Частичная занятость'},
+        {'id': 3, 'name': 'Удаленно', 'description': 'Работа из дома'},
+        {'id': 4, 'name': 'Гибкий график', 'description': 'Свободный график работы'},
+        {'id': 5, 'name': 'Сменный график', 'description': 'Работа по сменам'}
     ]
     for i, emp_type in enumerate(employment_types):
         existing = C_Employment_Type.query.filter_by(name=emp_type['name']).first()

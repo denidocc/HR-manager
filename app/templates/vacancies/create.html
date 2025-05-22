@@ -151,7 +151,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="aiGeneratorModalLabel">Генерация вакансии с помощью ИИ</h5>
+                <h5 class="modal-title" id="aiGeneratorModalLabel">Генерация вакансии</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -326,12 +326,20 @@
                     const employmentTypeSelect = document.getElementById('id_c_employment_type');
                     const selectedEmploymentTypeId = document.getElementById('ai_employment_type').value;
                     
-                    // Устанавливаем значение по ID, а не по тексту
-                    for (let i = 0; i < employmentTypeSelect.options.length; i++) {
-                        if (employmentTypeSelect.options[i].value === selectedEmploymentTypeId) {
-                            employmentTypeSelect.selectedIndex = i;
-                            break;
+                    console.log('Выбранный тип занятости:', selectedEmploymentTypeId);
+                    
+                    // Устанавливаем значение типа занятости
+                    if (selectedEmploymentTypeId) {
+                        // Устанавливаем значение по ID
+                        for (let i = 0; i < employmentTypeSelect.options.length; i++) {
+                            if (employmentTypeSelect.options[i].value === selectedEmploymentTypeId) {
+                                employmentTypeSelect.selectedIndex = i;
+                                break;
+                            }
                         }
+                    } else {
+                        // Если тип занятости не выбран, выбираем первый элемент (пустой)
+                        employmentTypeSelect.selectedIndex = 0;
                     }
                     
                     // Заполняем текстовые поля
@@ -422,4 +430,4 @@
         });
     });
 </script>
-{% endblock %} 
+{% endblock %}

@@ -1,8 +1,3 @@
----
-description: 
-globs: 
-alwaysApply: true
----
 # Правила структурирования проекта Flask с PostgreSQL
 
 # Название проекта: Clever HR
@@ -39,6 +34,7 @@ alwaysApply: true
   - Настройка логирования с различными обработчиками для консоли и файлов
   - Регистрация всех blueprints
   - Определение обработчиков ошибок и middleware
+
 - **Пример инициализации**:
   ```python
   app = Flask(__name__)

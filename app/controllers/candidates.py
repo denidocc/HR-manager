@@ -18,7 +18,6 @@ from sqlalchemy import desc, func, cast
 import sqlalchemy as sa
 import fitz  # PyMuPDF для работы с PDF
 import numpy as np
-import cv2
 from openai import OpenAI
 import base64
 import docx
@@ -297,7 +296,7 @@ def change_status(id):
     candidate = Candidate.query.get_or_404(id)
     
     # Проверяем, что кандидат принадлежит вакансии текущего HR
-    if not candidate.vacancy or candidate.vacancy.id_hr != current_user.id:
+    if not candidate.vacancy or candidate.vacancy.creator != current_user.id:
         flash('У вас нет доступа к этому кандидату', 'danger')
         return redirect(url_for('candidates.index'))
     

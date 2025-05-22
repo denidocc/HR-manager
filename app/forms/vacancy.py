@@ -15,7 +15,7 @@ class VacancyForm(FlaskForm):
     
     id_c_employment_type = SelectField('Тип занятости', 
         validators=[DataRequired(message='Выберите тип занятости')], 
-        coerce=lambda x: int(x) if x is not None and (isinstance(x, str) and x.strip() or not isinstance(x, str)) else None
+        coerce=lambda x: int(x) if x is not None and x != '' else None
     )
     
     description_tasks = TextAreaField('Описание задач', validators=[
@@ -58,6 +58,7 @@ class VacancyForm(FlaskForm):
         """Валидация выбора типа занятости"""
         if field.data is None:
             raise ValidationError('Выберите тип занятости')
+        # Значение 0 теперь допустимо, так как это "Неизвестно"
 
 class VacancyAIGeneratorForm(FlaskForm):
     """Мини-форма для генерации вакансии с помощью ИИ"""
@@ -68,7 +69,7 @@ class VacancyAIGeneratorForm(FlaskForm):
     
     id_c_employment_type = SelectField('Тип занятости', 
         validators=[DataRequired(message='Выберите тип занятости')],
-        coerce=lambda x: int(x) if x is not None and (isinstance(x, str) and x.strip() or not isinstance(x, str)) else None
+        coerce=lambda x: int(x) if x is not None and x != '' else None
     )
     
     description_tasks = TextAreaField('Описание задач (кратко)', validators=[
@@ -86,4 +87,5 @@ class VacancyAIGeneratorForm(FlaskForm):
     def validate_id_c_employment_type(self, field):
         """Валидация выбора типа занятости"""
         if field.data is None:
-            raise ValidationError('Выберите тип занятости') 
+            raise ValidationError('Выберите тип занятости')
+        # Значение 0 теперь допустимо, так как это "Неизвестно"

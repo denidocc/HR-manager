@@ -60,7 +60,7 @@ class User(UserMixin, db.Model):
             return sorted(self.selection_stages, key=lambda stage: stage.order)
         
         # Если у пользователя нет собственных этапов, возвращаем стандартные
-        return C_Selection_Stage.query.filter_by(is_default=True).order_by(C_Selection_Stage.order).all()
+        return C_Selection_Stage.query.filter_by(type='standard').order_by(C_Selection_Stage.order).all()
     
     def initialize_default_stages(self):
         """Инициализирует стандартные этапы отбора для нового пользователя"""

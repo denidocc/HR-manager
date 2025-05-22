@@ -609,7 +609,7 @@ def update_selection_stages(id):
             
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Ошибка при обновлении этапов отбора: {str(e)}")
+        logger.error(f"Ошибка при обновлении этапов отбора: {str(e)}")
         flash(f'Ошибка при обновлении этапов отбора: {str(e)}', 'danger')
     
     return redirect(url_for('vacancies.edit', id=id))

@@ -67,8 +67,8 @@ class VacancyAIGeneratorForm(FlaskForm):
     ])
     
     id_c_employment_type = SelectField('Тип занятости', 
-        validators=[DataRequired(message='Выберите тип занятости')], 
-        coerce=lambda x: int(x) if x and (isinstance(x, str) and x.strip() or not isinstance(x, str)) else None
+        validators=[DataRequired(message='Выберите тип занятости')],
+        coerce=lambda x: int(x) if x is not None and (isinstance(x, str) and x.strip() or not isinstance(x, str)) else None
     )
     
     description_tasks = TextAreaField('Описание задач (кратко)', validators=[

@@ -4,7 +4,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort
 from flask_login import current_user
 from app import db
-from app.models import Vacancy, Candidate, Notification, SystemLog
+from app.models import Vacancy, Candidate, Notification, SystemLog, User_Selection_Stage
 from app.forms.application import ApplicationForm
 from app.utils.file_processing import save_resume, extract_text_from_resume
 from app.utils.ai_service import request_ai_analysis, process_resume_and_analyze
@@ -132,8 +132,7 @@ def apply(vacancy_id):
                 cast(Candidate._phone, sa.LargeBinary),
                 current_app.config['ENCRYPTION_KEY'],
                 current_app.config.get('ENCRYPTION_OPTIONS', '')
-            ) == form.phone.data,
-            Candidate.id_c_selection_stage != 3  # Разрешаем повторную подачу, если предыдущая была отклонена
+            ) == form.phone.data, # Разрешаем повторную подачу, если предыдущая была отклонена
         )
     ).first()
 
@@ -183,9 +182,21 @@ def apply(vacancy_id):
                 "gender": request.form.get('gender')
             }
             
+            # Получаем первый этап отбора для HR-менеджера
+            first_stage = User_Selection_Stage.query.filter_by(
+                user_id=vacancy.created_by,
+                is_active=True
+            ).order_by(User_Selection_Stage.order).first()
+            
+            if not first_stage:
+                flash('Ошибка: не найдены этапы отбора для HR-менеджера', 'danger')
+                return redirect(url_for('public_bp.vacancy_detail', id=vacancy_id))
+            
             # Создаем кандидата
             candidate = Candidate(
                 vacancy_id=vacancy.id,
+                user_id=vacancy.created_by,
+                stage_id=first_stage.stage_id,  # Используем ID этапа из user_selection_stages
                 full_name=form.full_name.data,
                 email=form.email.data,
                 phone=form.phone.data,
@@ -195,7 +206,6 @@ def apply(vacancy_id):
                 cover_letter=form.cover_letter.data,
                 resume_path=resume_path,
                 resume_text="{}",  # Пустой JSON для начала
-                id_c_selection_stage=0,  # Начальный этап отбора
                 tracking_code=tracking_code,
                 gender=request.form.get('gender')
             )
@@ -222,7 +232,7 @@ def apply(vacancy_id):
             
             # Запускаем асинхронную обработку резюме и последующий AI-анализ
             if resume_path:
-                thread = Thread(target=process_resume_and_analyze, args=(candidate.id, resume_path))
+                thread = Thread(target=process_resume_async, args=(candidate.id, resume_path))
                 thread.daemon = True
                 thread.start()
             

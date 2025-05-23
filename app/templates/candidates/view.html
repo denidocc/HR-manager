@@ -42,8 +42,8 @@
                         <dt class="col-sm-4">Этап отбора:</dt>
                         <dd class="col-sm-8">
                             <span id="statusBadge" class="badge rounded-pill" 
-                                  style="background-color: {{ candidate.selection_stage.color if candidate.selection_stage else 'secondary' }}">
-                                {{ candidate.selection_stage.name if candidate.selection_stage else 'Заявка подана' }}
+                                  style="background-color: {{ candidate.stage_id.color if candidate.selection_stage else 'secondary' }}">
+                                {{ candidate.stage_id.name if candidate.selection_stage else 'Заявка подана' }}
                             </span>
                         </dd>
                         
@@ -65,7 +65,7 @@
                                 <label for="stage-select" class="form-label">Этап отбора</label>
                                 <select name="stage_id" class="form-select" id="stage-select">
                                     {% for stage in stages %}
-                                    <option value="{{ stage.id }}" {% if candidate.id_c_selection_stage == stage.id %}selected{% endif %}>{{ stage.name }}</option>
+                                    <option value="{{ stage.id }}" {% if candidate.stage_id == stage.id %}selected{% endif %}>{{ stage.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -95,7 +95,7 @@
                         <ul class="list-group">
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 <div><strong>Новая заявка</strong></div>
-                                {% if candidate.id_c_selection_stage == 0 %}
+                                {% if candidate.stage_id == 0 %}
                                 <span class="badge bg-primary rounded-pill">Текущий этап</span>
                                 {% endif %}
                             </li>
@@ -108,7 +108,7 @@
                                             <strong>{{ stage.name }}</strong>
                                             <p class="mb-0 small text-muted">{{ stage.description }}</p>
                                         </div>
-                                        {% if candidate.id_c_selection_stage == stage_index %}
+                                        {% if candidate.stage_id == stage_index %}
                                         <span class="badge bg-primary rounded-pill">Текущий этап</span>
                                         {% endif %}
                                     </li>
@@ -122,13 +122,13 @@
                             <!-- Финальные статусы всегда показываем -->
                             <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-success">
                                 <div><strong>Принят на работу</strong></div>
-                                {% if candidate.id_c_selection_stage == 4 %}
+                                {% if candidate.stage_id == 4 %}
                                 <span class="badge bg-primary rounded-pill">Текущий этап</span>
                                 {% endif %}
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-danger">
                                 <div><strong>Отклонен</strong></div>
-                                {% if candidate.id_c_selection_stage == 5 %}
+                                {% if candidate.stage_id == 5 %}
                                 <span class="badge bg-primary rounded-pill">Текущий этап</span>
                                 {% endif %}
                             </li>

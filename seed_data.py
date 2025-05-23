@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from faker import Faker
 from app import create_app, db
-from app.models import User, Vacancy, Candidate, Notification, SystemLog
+from app.models import User, Vacancy, Candidate, Notification, SystemLog, User_Selection_Stage
 from app.models import C_Gender, C_User_Status, C_Selection_Stage, C_Employment_Type, C_Education
 from tqdm import tqdm
 from sqlalchemy.exc import IntegrityError
@@ -97,27 +97,51 @@ def create_c_user_status():
     except Exception as e:
         db.session.rollback()
         print(f"Ошибка при обновлении справочника статусов пользователей: {e}")
+
 def create_c_selection_stage():
     """Создание справочника этапов отбора"""
-    stages = [
-        {'name': 'Заявка подана', 'description': 'Кандидат только что подал заявку', 'color': '#3498db', 'order': 1},
-        {'name': 'Рассмотрение резюме', 'description': 'Резюме кандидата находится на рассмотрении', 'color': '#17a2b8', 'order': 2},
-        {'name': 'Назначено интервью', 'description': 'Кандидату назначено собеседование', 'color': '#f39c12', 'order': 3},
-        {'name': 'Ожидает решения', 'description': 'Кандидат ожидает решения после интервью', 'color': '#9b59b6', 'order': 4},
-        {'name': 'Принят', 'description': 'Кандидат принят на работу', 'color': '#2ecc71', 'order': 5},
-        {'name': 'Отклонен', 'description': 'Кандидат не прошел отбор', 'color': '#e74c3c', 'order': 6}
+    from app.models.c_selection_status import C_Selection_Status
+    
+    # Сначала создаем статусы
+    statuses = [
+        {'name': 'Неизвестно', 'code': 'UNKNOWN', 'description': 'Статус не определен'},
+        {'name': 'Новый', 'code': 'NEW', 'description': 'Новая заявка'},
+        {'name': 'В процессе', 'code': 'IN_PROGRESS', 'description': 'Кандидат в процессе отбора'},
+        {'name': 'Отклонен', 'code': 'REJECT', 'description': 'Кандидат отклонен'},
+        {'name': 'Принят', 'code': 'ACCEPT', 'description': 'Кандидат принят'}
     ]
-    for i, stage in enumerate(stages):
-        existing = C_Selection_Stage.query.filter_by(name=stage['name']).first()
+    
+    status_map = {}
+    for status_data in statuses:
+        status = create_if_not_exists(C_Selection_Status, status_data['name'], 
+                                    code=status_data['code'],
+                                    description=status_data['description'])
+        status_map[status.code] = status
+    
+    # Теперь создаем этапы
+    stages = [
+        {'name': 'Заявка подана', 'description': 'Кандидат только что подал заявку', 'color': '#3498db', 'order': 1, 'status_code': 'NEW'},
+        {'name': 'Рассмотрение резюме', 'description': 'Резюме кандидата находится на рассмотрении', 'color': '#17a2b8', 'order': 2, 'status_code': 'IN_PROGRESS'},
+        {'name': 'Назначено интервью', 'description': 'Кандидату назначено собеседование', 'color': '#f39c12', 'order': 3, 'status_code': 'IN_PROGRESS'},
+        {'name': 'Ожидает решения', 'description': 'Кандидат ожидает решения после интервью', 'color': '#9b59b6', 'order': 4, 'status_code': 'IN_PROGRESS'},
+        {'name': 'Принят', 'description': 'Кандидат принят на работу', 'color': '#2ecc71', 'order': 5, 'status_code': 'ACCEPT'},
+        {'name': 'Отклонен', 'description': 'Кандидат не прошел отбор', 'color': '#e74c3c', 'order': 6, 'status_code': 'REJECT'}
+    ]
+    
+    for stage_data in stages:
+        existing = C_Selection_Stage.query.filter_by(name=stage_data['name']).first()
         if not existing:
             new_stage = C_Selection_Stage(
-                id=i,
-                name=stage['name'],
-                description=stage['description'],
-                color=stage['color'],
-                order=stage['order']
+                name=stage_data['name'],
+                description=stage_data['description'],
+                color=stage_data['color'],
+                order=stage_data['order'],
+                is_standard=True,
+                is_active=True,
+                id_c_selection_status=status_map[stage_data['status_code']].id
             )
             db.session.add(new_stage)
+    
     db.session.commit()
     print("Справочник этапов отбора успешно создан")
 
@@ -198,8 +222,14 @@ def create_candidates(num_candidates=20):
         print("Нет вакансий для кандидатов. Сначала создайте вакансии.")
         return
     
+    # Получаем всех HR-менеджеров
+    hrs = User.query.filter_by(role='hr').all()
+    if not hrs:
+        print("Нет HR-менеджеров. Сначала создайте HR-менеджеров.")
+        return
+    
     # Получаем все этапы отбора
-    stages = C_Selection_Stage.query.all()
+    stages = C_Selection_Stage.query.filter_by(is_standard=True).all()
     if not stages:
         print("Нет этапов отбора. Сначала создайте этапы отбора.")
         return
@@ -210,11 +240,31 @@ def create_candidates(num_candidates=20):
         return
     
     for _ in tqdm(range(num_candidates - existing_count), desc="Создание кандидатов"):
+        # Выбираем случайного HR и вакансию
+        hr = random.choice(hrs)
         vacancy = random.choice(vacancies)
         stage = random.choice(stages)
         
+        # Создаем или получаем User_Selection_Stage для HR
+        user_stage = User_Selection_Stage.query.filter_by(
+            user_id=hr.id,
+            stage_id=stage.id
+        ).first()
+        
+        if not user_stage:
+            user_stage = User_Selection_Stage(
+                user_id=hr.id,
+                stage_id=stage.id,
+                order=stage.order,
+                is_active=True
+            )
+            db.session.add(user_stage)
+            db.session.flush()  # Получаем ID для user_stage
+        
         candidate = Candidate(
             vacancy_id=vacancy.id,
+            user_id=hr.id,
+            stage_id=stage.id,
             full_name=fake.name(),
             email=fake.email(),
             phone=fake.phone_number(),
@@ -228,7 +278,6 @@ def create_candidates(num_candidates=20):
             vacancy_answers={},
             soft_answers={},
             cover_letter=fake.text(max_nb_chars=500),
-            id_c_selection_stage=stage.id,
             tracking_code=str(uuid.uuid4()),
             created_at=fake.date_time_between(start_date='-1y', end_date='now', tzinfo=timezone.utc)
         )
@@ -334,7 +383,7 @@ def create_notifications(num_notifications=50):
         if notification_type == "application_received":
             message = f"Ваша заявка на вакансию '{candidate.vacancy.title}' принята. Мы свяжемся с вами после рассмотрения."
         elif notification_type == "status_update":
-            message = f"Статус вашей заявки на вакансию '{candidate.vacancy.title}' изменен на '{candidate.selection_stage.name}'."
+            message = f"Статус вашей заявки на вакансию '{candidate.vacancy.title}' изменен на '{candidate.user_selection_stage.selection_stage.name}'."
         elif notification_type == "interview_invitation":
             date = fake.date_time_between(start_date='+1d', end_date='+14d', tzinfo=timezone.utc)
             message = f"Приглашаем вас на собеседование по вакансии '{candidate.vacancy.title}'. Дата: {date.strftime('%d.%m.%Y %H:%M')}."

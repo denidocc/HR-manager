@@ -64,7 +64,7 @@
                                 <tbody id="stagesTableBody">
                                     {% if stages %}
                                         {% for stage in stages %}
-                                        <tr data-id="{{ stage.id }}" data-name="{{ stage.name }}" data-description="{{ stage.description }}" data-color="{{ stage.color }}" data-active="{{ stage.is_active|lower }}" data-default="{{ stage.is_default|lower }}">
+                                        <tr data-id="{{ stage.id }}" data-name="{{ stage.name }}" data-description="{{ stage.description }}" data-color="{{ stage.color }}" data-active="{{ stage.is_active|lower }}" data-standard="{{ stage.is_standard|lower }}">
                                             <td class="handle"><i class="fas fa-grip-vertical"></i></td>
                                             <td>
                                                 <div class="d-flex align-items-center">
@@ -75,7 +75,7 @@
                                             <td>{{ stage.description }}</td>
                                             <td><span class="color-sample" style="background-color: {{ stage.color }}"></span></td>
                                             <td>
-                                                {% if stage.is_default %}
+                                                {% if stage.is_standard %}
                                                 <span class="badge bg-info">Стандартный</span>
                                                 {% else %}
                                                 <span class="badge bg-primary">Персональный</span>
@@ -128,7 +128,7 @@
             <div class="modal-body">
                 <form id="stageForm">
                     <input type="hidden" id="stageId" value="">
-                    <input type="hidden" id="stageDefault" value="false">
+                    <input type="hidden" id="stageStandard" value="false">
                     <div class="mb-3">
                         <label for="stageName" class="form-label">Название этапа</label>
                         <input type="text" class="form-control" id="stageName" required>
@@ -255,7 +255,7 @@
             document.getElementById('stageDescription').value = '';
             document.getElementById('stageColor').value = '#6c757d';
             document.getElementById('stageActive').checked = true;
-            document.getElementById('stageDefault').value = 'false';
+            document.getElementById('stageStandard').value = 'false';
             stageModal.show();
         });
         
@@ -319,7 +319,7 @@
             const stageDescription = document.getElementById('stageDescription').value;
             const stageColor = document.getElementById('stageColor').value;
             const stageActive = document.getElementById('stageActive').checked;
-            const stageDefault = document.getElementById('stageDefault').value === 'true';
+            const stageStandard = document.getElementById('stageStandard').value === 'true';
             
             if (!stageName) {
                 alert('Введите название этапа');
@@ -371,7 +371,7 @@
                 const stageDescription = row.dataset.description;
                 const stageColor = row.dataset.color;
                 const stageActive = row.dataset.active === 'true';
-                const stageDefault = row.dataset.default === 'true';
+                const stageStandard = row.dataset.standard === 'true';
                 
                 document.getElementById('stageModalLabel').textContent = 'Редактирование этапа';
                 document.getElementById('stageId').value = stageId;
@@ -379,7 +379,7 @@
                 document.getElementById('stageDescription').value = stageDescription;
                 document.getElementById('stageColor').value = stageColor;
                 document.getElementById('stageActive').checked = stageActive;
-                document.getElementById('stageDefault').value = stageDefault;
+                document.getElementById('stageStandard').value = stageStandard;
                 
                 stageModal.show();
             }
@@ -391,12 +391,12 @@
                 const row = e.target.closest('tr');
                 const stageId = row.dataset.id;
                 const stageName = row.dataset.name;
-                const stageDefault = row.dataset.default === 'true';
+                const stageStandard = row.dataset.standard === 'true';
                 
                 document.getElementById('deleteStageNameSpan').textContent = stageName;
                 
                 // Показываем предупреждение для стандартных этапов
-                if (stageDefault) {
+                if (stageStandard) {
                     document.getElementById('defaultStageWarning').classList.remove('d-none');
                 } else {
                     document.getElementById('defaultStageWarning').classList.add('d-none');
@@ -444,14 +444,14 @@
         });
         
         // Функция для добавления этапа в таблицу
-        function addStageToTable(id, name, description, color, isActive, isDefault) {
+        function addStageToTable(id, name, description, color, isActive, isStandard) {
             const newRow = document.createElement('tr');
             newRow.dataset.id = id || '';
             newRow.dataset.name = name;
             newRow.dataset.description = description || '';
             newRow.dataset.color = color || '#6c757d';
             newRow.dataset.active = (isActive !== false).toString();
-            newRow.dataset.default = (isDefault === true).toString();
+            newRow.dataset.standard = (isStandard === true).toString();
             
             newRow.innerHTML = `
                 <td class="handle"><i class="fas fa-grip-vertical"></i></td>
@@ -464,7 +464,7 @@
                 <td>${description || ''}</td>
                 <td><span class="color-sample" style="background-color: ${color || '#6c757d'}"></span></td>
                 <td>
-                    ${isDefault ? 
+                    ${isStandard ? 
                     '<span class="badge bg-info">Стандартный</span>' : 
                     '<span class="badge bg-primary">Персональный</span>'}
                 </td>
@@ -493,7 +493,7 @@
                     description: row.dataset.description || '',
                     color: row.dataset.color || '#6c757d',
                     is_active: row.dataset.active === 'true',
-                    is_default: row.dataset.default === 'true'
+                    is_standard: row.dataset.standard === 'true'
                 });
             });
             

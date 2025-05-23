@@ -27,7 +27,7 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav ms-auto">
-                        {% if current_user.is_authenticated %}
+                        {% if current_user.is_authenticated and current_user.id_c_user_status == 1 %}
                             <li class="nav-item">
                                 <a class="nav-link {% if request.endpoint and request.endpoint.startswith('dashboard') %}active{% endif %}" href="{% if current_user.role == 'admin' %}{{ url_for('dashboard.index') }}{% else %}{{ url_for('dashboard.hr_dashboard') }}{% endif %}">
                                     <i class="fas fa-tachometer-alt me-1"></i>{% if current_user.role == 'admin' %}Панель админа{% else %}Панель HR{% endif %}

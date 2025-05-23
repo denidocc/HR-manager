@@ -428,7 +428,7 @@ def candidates(id):
     
     # Фильтрация по статусу
     if status_filter is not None:
-        query = query.filter_by(id_c_selection_stage=status_filter)
+        query = query.filter_by(stage_id=status_filter)
     
     # Сортировка
     if sort_by == 'date':

@@ -176,3 +176,4 @@ cython_debug/
 
 check_config.py
 test_openai_key.py
+uploads/

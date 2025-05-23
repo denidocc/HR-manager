@@ -17,3 +17,5 @@ from app.models.vacancy_industry import VacancyIndustry
 from app.models.keyword import Keyword
 from app.models.keyword_category import KeywordCategory 
 from app.models.c_selection_stage import C_Selection_Stage 
+from app.models.user_selection_stages import User_Selection_Stage
+from app.models.c_selection_status import C_Selection_Status

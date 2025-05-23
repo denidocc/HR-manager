@@ -34,7 +34,7 @@ def index():
     candidate_statuses_counts = {}
     statuses = C_Selection_Stage.query.all()
     for status in statuses:
-        count = Candidate.query.filter_by(id_c_selection_stage=status.id).count()
+        count = Candidate.query.filter_by(stage_id=status.id).count()
         candidate_statuses_counts[status.name] = {
             'count': count, 
             'color': status.color
@@ -64,7 +64,7 @@ def index():
         and_(
             Candidate.interview_date != None,
             Candidate.interview_date >= datetime.now(),
-            Candidate.id_c_selection_stage == 2  # ID статуса "Назначено интервью"
+            Candidate.stage_id == 2  # ID статуса "Назначено интервью"
         )
     ).order_by(Candidate.interview_date).all()
     
@@ -109,7 +109,7 @@ def statistics():
         for stage in stages:
             count = Candidate.query.filter_by(
                 vacancy_id=vacancy.id, 
-                id_c_selection_stage=stage.id
+                stage_id=stage.id
             ).count()
             vacancy_data['data'].append({
                 'stage': stage.name,
@@ -157,7 +157,7 @@ def api_chart_data():
         C_Selection_Stage.name,
         C_Selection_Stage.color,
         func.count(Candidate.id).label('count')
-    ).join(Candidate, C_Selection_Stage.id == Candidate.id_c_selection_stage)\
+    ).join(Candidate, C_Selection_Stage.id == Candidate.stage_id)\
      .group_by(C_Selection_Stage.id)\
      .order_by(desc('count')).all()
     
@@ -398,12 +398,12 @@ def recruitment_funnel():
         Vacancy.id,
         Vacancy.title,
         func.count(Candidate.id).label('total_applications'),
-        func.sum(case([(Candidate.id_c_selection_stage == 0, 1)], else_=0)).label('new_applications'),
-        func.sum(case([(Candidate.id_c_selection_stage == 1, 1)], else_=0)).label('reviewed'),
-        func.sum(case([(Candidate.id_c_selection_stage == 2, 1)], else_=0)).label('interview_invited'),
-        func.sum(case([(Candidate.id_c_selection_stage == 5, 1)], else_=0)).label('interviewed'),
-        func.sum(case([(Candidate.id_c_selection_stage == 4, 1)], else_=0)).label('offered'),
-        func.sum(case([(Candidate.id_c_selection_stage == 3, 1)], else_=0)).label('hired')
+        func.sum(case([(Candidate.stage_id == 0, 1)], else_=0)).label('new_applications'),
+        func.sum(case([(Candidate.stage_id == 1, 1)], else_=0)).label('reviewed'),
+        func.sum(case([(Candidate.stage_id == 2, 1)], else_=0)).label('interview_invited'),
+        func.sum(case([(Candidate.stage_id == 5, 1)], else_=0)).label('interviewed'),
+        func.sum(case([(Candidate.stage_id == 4, 1)], else_=0)).label('offered'),
+        func.sum(case([(Candidate.stage_id == 3, 1)], else_=0)).label('hired')
     ).join(
         Candidate, Vacancy.id == Candidate.vacancy_id
     )
@@ -1204,8 +1204,8 @@ def update_kanban_status():
             return jsonify({'status': 'error', 'message': 'У вас нет доступа к этому кандидату'}), 403
             
         # Обновляем статус кандидата
-        old_status = candidate.id_c_selection_stage
-        candidate.id_c_selection_stage = new_status_id
+        old_status = candidate.stage_id
+        candidate.stage_id = new_status_id
         candidate.updated_at = datetime.now(timezone.utc)
         
         # Добавляем комментарий о смене статуса, если предоставлен
@@ -1250,94 +1250,3 @@ def update_kanban_status():
         current_app.logger.error(f"Ошибка при обновлении статуса кандидата: {str(e)}")
         db.session.rollback()
         return jsonify({'status': 'error', 'message': f'Произошла ошибка: {str(e)}'}), 500
-
-@dashboard_bp.route('/kanban')
-@profile_time
-@login_required
-@hr_required
-def kanban():
-    """Канбан-доска кандидатов для HR-менеджера"""
-    # Получаем вакансии HR-менеджера для фильтра
-    vacancies = Vacancy.query.filter_by(created_by=current_user.id).all()
-    
-    # Получаем параметры фильтрации
-    vacancy_id = request.args.get('vacancy_id', type=int)
-    
-    # Получаем этапы отбора
-    selection_stages = C_Selection_Stage.query.order_by(C_Selection_Stage.order.asc()).all()
-    
-    # Базовый запрос кандидатов
-    candidates_query = db.session.query(
-        Candidate.id,
-        Candidate.full_name,
-        Candidate.vacancy_id,
-        Candidate.id_c_selection_stage,
-        Candidate.resume_path,
-        Candidate.ai_match_percent,
-        Candidate.created_at,
-        Candidate.updated_at,
-        func.pgp_sym_decrypt(
-            cast(Candidate._email, sa.LargeBinary),
-            current_app.config['ENCRYPTION_KEY'],
-            current_app.config.get('ENCRYPTION_OPTIONS', '')
-        ).label('email'),
-        func.pgp_sym_decrypt(
-            cast(Candidate._phone, sa.LargeBinary),
-            current_app.config['ENCRYPTION_KEY'],
-            current_app.config.get('ENCRYPTION_OPTIONS', '')
-        ).label('phone'),
-        Vacancy.title.label('vacancy_title'),
-        C_Selection_Stage.name.label('stage_name'),
-        C_Selection_Stage.color.label('stage_color')
-    ).join(
-        Vacancy, Candidate.vacancy_id == Vacancy.id
-    ).join(
-        C_Selection_Stage, Candidate.id_c_selection_stage == C_Selection_Stage.id
-    ).filter(
-        Vacancy.created_by == current_user.id
-    )
-    
-    # Применяем фильтр по вакансии, если указан
-    if vacancy_id:
-        candidates_query = candidates_query.filter(Candidate.vacancy_id == vacancy_id)
-    
-    # Получаем и группируем кандидатов по статусам
-    candidates = candidates_query.order_by(Candidate.updated_at.desc()).all()
-    
-    # Группировка кандидатов по статусам для канбан-доски
-    kanban_data = {}
-    for stage in selection_stages:
-        kanban_data[stage.id] = {
-            'name': stage.name,
-            'description': stage.description,
-            'color': stage.color,
-            'candidates': []
-        }
-    
-    # Заполняем канбан данными о кандидатах
-    for candidate in candidates:
-        status_id = candidate.id_c_selection_stage
-        if status_id in kanban_data:
-            candidate_data = {
-                'id': candidate.id,
-                'name': candidate.full_name,
-                'email': candidate.email,
-                'phone': candidate.phone,
-                'vacancy_id': candidate.vacancy_id,
-                'vacancy_title': candidate.vacancy_title,
-                'ai_match_percent': candidate.ai_match_percent,
-                'created_at': candidate.created_at,
-                'resume_path': candidate.resume_path,
-                'stage_name': candidate.stage_name,
-                'stage_color': candidate.stage_color
-            }
-            kanban_data[status_id]['candidates'].append(candidate_data)
-    
-    return render_template(
-        'dashboard/kanban.html',
-        kanban_data=kanban_data,
-        vacancies=vacancies,
-        vacancy_id=vacancy_id,
-        selection_stages=selection_stages,
-        title='Канбан кандидатов'
-    )

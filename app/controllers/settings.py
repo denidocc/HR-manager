@@ -6,6 +6,8 @@ from flask_login import login_required, current_user
 from app import db
 from app.models.user import User
 from app.models.c_selection_stage import C_Selection_Stage
+from app.models.user_selection_stages import User_Selection_Stage
+from app.models.c_selection_status import C_Selection_Status
 from functools import wraps
 import json
 import sqlalchemy as sa
@@ -127,8 +129,14 @@ def selection_stages():
             # Получаем данные о этапах отбора из формы
             stages_data = json.loads(request.form.get('stages_data', '[]'))
             
-            # Очищаем существующие связи пользователя с этапами отбора
-            current_user.selection_stages = []
+            # Получаем статус "В процессе" для новых этапов
+            in_progress_status = C_Selection_Status.query.filter_by(name='В процессе').first()
+            if not in_progress_status:
+                flash('Ошибка: статус "В процессе" не найден в базе данных.', 'danger')
+                return redirect(url_for('settings_bp.selection_stages'))
+            
+            # Удаляем существующие связи пользователя с этапами отбора
+            User_Selection_Stage.query.filter_by(user_id=current_user.id).delete()
             
             # Создаем новые этапы или связываем с существующими
             for i, stage_data in enumerate(stages_data):
@@ -145,21 +153,25 @@ def selection_stages():
                             color=stage_data.get('color', '#6c757d'),
                             order=i + 1,
                             is_active=stage_data.get('is_active', True),
-                            type='user'
+                            is_standard=False,
+                            id_c_selection_status=in_progress_status.id
                         )
                         db.session.add(stage)
+                        db.session.flush()  # Получаем ID нового этапа
                     else:
-                        # Если этап стандартный (is_default=True), создаем его копию
-                        if stage.type == 'standard':
+                        # Если этап стандартный (is_standard=True), создаем его копию
+                        if stage.is_standard:
                             new_stage = C_Selection_Stage(
                                 name=stage_data['name'],
                                 description=stage_data.get('description', ''),
                                 color=stage_data.get('color', '#6c757d'),
                                 order=i + 1,
                                 is_active=stage_data.get('is_active', True),
-                                type='user'
+                                is_standard=False,
+                                id_c_selection_status=in_progress_status.id
                             )
                             db.session.add(new_stage)
+                            db.session.flush()  # Получаем ID нового этапа
                             stage = new_stage
                 else:
                     # Создаем новый этап
@@ -169,12 +181,20 @@ def selection_stages():
                         color=stage_data.get('color', '#6c757d'),
                         order=i + 1,
                         is_active=stage_data.get('is_active', True),
-                        type='user'
+                        is_standard=False,
+                        id_c_selection_status=in_progress_status.id
                     )
                     db.session.add(stage)
+                    db.session.flush()  # Получаем ID нового этапа
                 
-                # Добавляем этап к пользователю
-                current_user.selection_stages.append(stage)
+                # Создаем связь между пользователем и этапом
+                user_stage = User_Selection_Stage(
+                    user_id=current_user.id,
+                    stage_id=stage.id,
+                    order=i + 1,
+                    is_active=stage_data.get('is_active', True)
+                )
+                db.session.add(user_stage)
                 
             # Сохраняем изменения
             db.session.commit()
@@ -203,7 +223,7 @@ def api_get_selection_stages():
         'color': stage.color,
         'order': stage.order,
         'is_active': stage.is_active,
-        'is_default': stage.is_default
+        'is_standard': stage.is_standard
     } for stage in stages])
 
 @settings_bp.route('/api/reset-selection-stages', methods=['POST'])
@@ -212,14 +232,21 @@ def api_get_selection_stages():
 def api_reset_selection_stages():
     """Сброс этапов отбора на стандартные"""
     try:
-        # Очищаем существующие этапы пользователя
-        current_user.selection_stages = []
+        # Удаляем существующие связи пользователя с этапами отбора
+        User_Selection_Stage.query.filter_by(user_id=current_user.id).delete()
         
         # Загружаем стандартные этапы
-        default_stages = C_Selection_Stage.query.filter_by(type='standard').order_by(C_Selection_Stage.order).all()
+        default_stages = C_Selection_Stage.query.filter_by(is_standard=True).order_by(C_Selection_Stage.order).all()
         
-        # Устанавливаем стандартные этапы для текущего пользователя
-        current_user.selection_stages = default_stages
+        # Создаем новые связи для стандартных этапов
+        for i, stage in enumerate(default_stages):
+            user_stage = User_Selection_Stage(
+                user_id=current_user.id,
+                stage_id=stage.id,
+                order=i + 1,
+                is_active=True
+            )
+            db.session.add(user_stage)
         
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Этапы отбора сброшены на стандартные'})

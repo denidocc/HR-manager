@@ -17,7 +17,7 @@
                                 <h4>{{ candidate.vacancy.title }}</h4>
                                 <p class="text-muted">Заявка подана: {{ candidate.created_at.strftime('%d.%m.%Y') }}</p>
                             </div>
-                            <span class="badge bg-primary px-3 py-2">{{ candidate.selection_stage.name }}</span>
+                            <span class="badge bg-primary px-3 py-2">{{ candidate.stage_id.name }}</span>
                         </div>
                         <div class="tracking-id mt-2">
                             <small class="text-muted">Код отслеживания: {{ candidate.tracking_code }}</small>
@@ -29,12 +29,12 @@
                         
                         <ul class="timeline">
                             <!-- Всегда показываем "Новая заявка" как первый этап -->
-                            <li class="timeline-item {{ 'active' if candidate.id_c_selection_stage >= 0 else '' }}">
+                            <li class="timeline-item {{ 'active' if candidate.stage_id >= 0 else '' }}">
                                 <span class="timeline-point"></span>
                                 <div class="timeline-content">
                                     <h5>Новая заявка</h5>
                                     <p>Ваша заявка получена и зарегистрирована в системе</p>
-                                    {% if candidate.id_c_selection_stage == 0 %}
+                                    {% if candidate.stage_id == 0 %}
                                         <small class="text-muted">{{ candidate.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
                                     {% endif %}
                                 </div>
@@ -43,12 +43,12 @@
                             {% if candidate.vacancy and candidate.vacancy.selection_stages_json %}
                                 {% for stage in candidate.vacancy.selection_stages_json %}
                                     {% set stage_index = loop.index %}
-                                    <li class="timeline-item {{ 'active' if candidate.id_c_selection_stage >= stage_index else '' }}">
+                                    <li class="timeline-item {{ 'active' if candidate.stage_id >= stage_index else '' }}">
                                         <span class="timeline-point"></span>
                                         <div class="timeline-content">
                                             <h5>{{ stage.name }}</h5>
                                             <p>{{ stage.description }}</p>
-                                            {% if candidate.id_c_selection_stage == stage_index %}
+                                            {% if candidate.stage_id == stage_index %}
                                                 {% if stage.name == 'Интервью' and candidate.interview_date %}
                                                     <small class="text-muted">Запланировано на: {{ candidate.interview_date.strftime('%d.%m.%Y %H:%M') }}</small>
                                                 {% else %}
@@ -60,32 +60,32 @@
                                 {% endfor %}
                             {% else %}
                                 <!-- Статические этапы, если у вакансии нет настроенных этапов отбора -->
-                                <li class="timeline-item {{ 'active' if candidate.id_c_selection_stage >= 1 else '' }}">
+                                <li class="timeline-item {{ 'active' if candidate.stage_id >= 1 else '' }}">
                                     <span class="timeline-point"></span>
                                     <div class="timeline-content">
                                         <h5>Рассмотрение резюме</h5>
                                         <p>HR-менеджер изучает вашу заявку и резюме</p>
-                                        {% if candidate.id_c_selection_stage == 1 %}
+                                        {% if candidate.stage_id == 1 %}
                                             <small class="text-muted">В процессе</small>
                                         {% endif %}
                                     </div>
                                 </li>
-                                <li class="timeline-item {{ 'active' if candidate.id_c_selection_stage >= 2 else '' }}">
+                                <li class="timeline-item {{ 'active' if candidate.stage_id >= 2 else '' }}">
                                     <span class="timeline-point"></span>
                                     <div class="timeline-content">
                                         <h5>Интервью</h5>
                                         <p>Приглашение на интервью с HR и техническими специалистами</p>
-                                        {% if candidate.id_c_selection_stage == 2 and candidate.interview_date %}
+                                        {% if candidate.stage_id == 2 and candidate.interview_date %}
                                             <small class="text-muted">Запланировано на: {{ candidate.interview_date.strftime('%d.%m.%Y %H:%M') }}</small>
                                         {% endif %}
                                     </div>
                                 </li>
-                                <li class="timeline-item {{ 'active' if candidate.id_c_selection_stage >= 3 else '' }}">
+                                <li class="timeline-item {{ 'active' if candidate.stage_id >= 3 else '' }}">
                                     <span class="timeline-point"></span>
                                     <div class="timeline-content">
                                         <h5>Ожидание решения</h5>
                                         <p>Ожидание решения после интервью</p>
-                                        {% if candidate.id_c_selection_stage == 3 %}
+                                        {% if candidate.stage_id == 3 %}
                                             <small class="text-muted">В процессе</small>
                                         {% endif %}
                                     </div>
@@ -97,14 +97,14 @@
                         <div class="final-status-container mt-4">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <div class="card final-status-card {{ 'active' if candidate.id_c_selection_stage == 4 else 'inactive' }}">
+                                    <div class="card final-status-card {{ 'active' if candidate.stage_id == 4 else 'inactive' }}">
                                         <div class="card-body">
                                             <div class="final-status-icon accepted">
                                                 <i class="fas fa-check-circle"></i>
                                             </div>
                                             <h5 class="card-title">Принят</h5>
                                             <p class="card-text">Вы приняты на работу</p>
-                                            {% if candidate.id_c_selection_stage == 4 %}
+                                            {% if candidate.stage_id == 4 %}
                                                 <div class="final-status-badge accepted">
                                                     <i class="fas fa-check"></i> Текущий статус
                                                 </div>
@@ -113,14 +113,14 @@
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="card final-status-card {{ 'active' if candidate.id_c_selection_stage == 5 else 'inactive' }}">
+                                    <div class="card final-status-card {{ 'active' if candidate.stage_id == 5 else 'inactive' }}">
                                         <div class="card-body">
                                             <div class="final-status-icon rejected">
                                                 <i class="fas fa-times-circle"></i>
                                             </div>
                                             <h5 class="card-title">Отклонен</h5>
                                             <p class="card-text">К сожалению, ваша кандидатура не подошла</p>
-                                            {% if candidate.id_c_selection_stage == 5 %}
+                                            {% if candidate.stage_id == 5 %}
                                                 <div class="final-status-badge rejected">
                                                     <i class="fas fa-times"></i> Текущий статус
                                                 </div>

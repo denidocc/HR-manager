@@ -5,14 +5,6 @@ import sqlalchemy as sa
 import sqlalchemy.orm as so
 from app import db
 
-# Ассоциативная таблица для связи "многие-ко-многим" между HR и этапами отбора
-user_selection_stages = db.Table('user_selection_stages',
-    sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id'), primary_key=True),
-    sa.Column('stage_id', sa.Integer, sa.ForeignKey('c_selection_stage.id'), primary_key=True),
-    sa.Column('order', sa.Integer, default=0),  # Порядок для конкретного пользователя
-    sa.Column('is_active', sa.Boolean, default=True)
-)
-
 class C_Selection_Stage(db.Model):
     """Справочник этапов отбора кандидатов"""
     __tablename__ = 'c_selection_stage'
@@ -20,14 +12,15 @@ class C_Selection_Stage(db.Model):
     id: so.Mapped[int] = so.mapped_column(primary_key=True)
     name: so.Mapped[str] = so.mapped_column(sa.Text, nullable=False)
     description: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
-    color: so.Mapped[str] = so.mapped_column(sa.String(20), default='#6c757d')
+    color: so.Mapped[str] = so.mapped_column(sa.Text, default='#6c757d')
     order: so.Mapped[int] = so.mapped_column(sa.Integer, default=0)
-    type: so.Mapped[str] = so.mapped_column(sa.String(50), default='standard')
+    is_standard: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=False)
     is_active: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=True)
+    id_c_selection_status: so.Mapped[int] = so.mapped_column(sa.Integer, sa.ForeignKey('c_selection_status.id'), nullable=False)
     
     # Отношения
-    candidates = so.relationship('Candidate', back_populates='selection_stage')
-    users = so.relationship('User', secondary=user_selection_stages, back_populates='selection_stages')
+    user_selection_stages = so.relationship('User_Selection_Stage', back_populates='selection_stage')
+    status = so.relationship('C_Selection_Status', back_populates='selection_stages')
     
     def __repr__(self):
         return f'<C_Selection_Stage {self.name}>'
@@ -35,15 +28,75 @@ class C_Selection_Stage(db.Model):
     @classmethod
     def create_default_stages(cls):
         """Создание стандартных этапов отбора"""
+        from app.models.c_selection_status import C_Selection_Status
+        
+        # Убедимся, что статусы созданы
+        C_Selection_Status.create_default_statuses()
+        
+        # Получаем статусы
+        unknown_status = C_Selection_Status.query.filter_by(code='UNKNOWN').first()
+        new_status = C_Selection_Status.query.filter_by(code='NEW').first()
+        in_progress_status = C_Selection_Status.query.filter_by(code='IN_PROGRESS').first()
+        reject_status = C_Selection_Status.query.filter_by(code='REJECT').first()
+        accept_status = C_Selection_Status.query.filter_by(code='ACCEPT').first()
+        
         stages = [
-            {"name": "Новая заявка", "description": "Кандидат только что подал заявку", "color": "#6c757d", "order": 0},
-            {"name": "Рассмотрение резюме", "description": "Резюме кандидата на рассмотрении", "color": "#17a2b8", "order": 1},
-            {"name": "Тестовое задание", "description": "Кандидат выполняет тестовое задание", "color": "#ffc107", "order": 2},
-            {"name": "Собеседование с HR", "description": "Запланировано собеседование с HR-менеджером", "color": "#fd7e14", "order": 3},
-            {"name": "Техническое интервью", "description": "Запланировано техническое собеседование", "color": "#6f42c1", "order": 4},
-            {"name": "Предложение", "description": "Кандидату сделано предложение", "color": "#20c997", "order": 5},
-            {"name": "Принят на работу", "description": "Кандидат принят на работу", "color": "#28a745", "order": 6},
-            {"name": "Отказ", "description": "Кандидату отказано", "color": "#dc3545", "order": 7}
+            {
+                "name": "Новая заявка",
+                "description": "Кандидат только что подал заявку",
+                "color": "#6c757d",
+                "order": 0,
+                "is_standard": True,
+                "id_c_selection_status": new_status.id
+            },
+            {
+                "name": "Рассмотрение резюме",
+                "description": "Резюме кандидата на рассмотрении",
+                "color": "#17a2b8",
+                "order": 1,
+                "is_standard": True,
+                "id_c_selection_status": in_progress_status.id
+            },
+            {
+                "name": "Тестовое задание",
+                "description": "Кандидат выполняет тестовое задание",
+                "color": "#ffc107",
+                "order": 2,
+                "is_standard": True,
+                "id_c_selection_status": in_progress_status.id
+            },
+            {
+                "name": "Собеседование с HR",
+                "description": "Запланировано собеседование с HR-менеджером",
+                "color": "#fd7e14",
+                "order": 3,
+                "is_standard": True,
+                "id_c_selection_status": in_progress_status.id
+            },
+            {
+                "name": "Техническое интервью",
+                "description": "Запланировано техническое собеседование",
+                "color": "#6f42c1",
+                "order": 4,
+                "is_standard": True,
+                "id_c_selection_status": in_progress_status.id
+            },
+            {
+                "name": "Принят на работу",
+                "description": "Кандидат принят на работу",
+                "color": "#28a745",
+                "order": 6,
+                "is_standard": True,
+                "id_c_selection_status": accept_status.id
+            },
+            {
+                "name": "Отказ",
+                "description": "Кандидату отказано",
+                "color": "#dc3545",
+                "order": 7,
+                "is_standard": True,
+                "id_c_selection_status": reject_status.id
+            }
         ]
         
         for stage_data in stages:

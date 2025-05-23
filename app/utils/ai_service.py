@@ -19,6 +19,8 @@ import io
 from datetime import datetime, timezone, timedelta
 from threading import Thread
 import logging
+from app import db
+from app.models.candidate import Candidate
 
 # Настройка логгера для использования вне контекста приложения
 logger = logging.getLogger('resume_processor')
@@ -159,6 +161,9 @@ def extract_resume_text(file_path):
                 )
                 
                 # Извлекаем распознанный текст из ответа
+                if not response.choices or not response.choices[0].message.content:
+                    current_app.logger.error(f"Пустой ответ от OpenAI API для страницы {page_num + 1}")
+                    continue
                 page_text = response.choices[0].message.content
                 all_pages_text.append(page_text)
             
@@ -395,100 +400,47 @@ def extract_structured_data_from_text(text, client):
         return {}
 
 def process_resume_and_analyze(candidate_id, resume_path):
-    """
-    Обрабатывает резюме кандидата и запускает AI-анализ
-    
-    Args:
-        candidate_id (int): ID кандидата
-        resume_path (str): Путь к файлу резюме
-        
-    Returns:
-        bool: True если обработка успешна, False в противном случае
-    """
-    from app import db
-    from app.models import Candidate
-    
-    # Создаем логгер для использования вне контекста приложения
-    logger = logging.getLogger('resume_processor')
-    
+    """Обработка резюме и запуск анализа"""
     try:
-        # Получаем данные кандидата
+        # Получаем кандидата
         candidate = Candidate.query.get(candidate_id)
         if not candidate:
-            logger.error(f"Кандидат с ID={candidate_id} не найден")
-            return False
+            current_app.logger.error(f"Кандидат не найден: {candidate_id}")
+            return
         
-        logger.info(f"Начинаем обработку резюме для кандидата ID={candidate_id}, файл: {resume_path}")
-        
-        # Проверяем существование файла
-        if not os.path.exists(resume_path):
-            logger.error(f"Файл резюме не существует: {resume_path}")
-            return False
+        # Проверяем наличие файла резюме
+        if not resume_path or not os.path.exists(resume_path):
+            current_app.logger.error(f"Файл резюме не найден: {resume_path}")
+            return
         
         # Извлекаем текст из резюме
-        resume_data = extract_resume_text(resume_path)
-        if not resume_data:
-            logger.error(f"Не удалось извлечь текст из резюме: {resume_path}")
-            return False
+        result = extract_resume_text(resume_path)
+        if not result:
+            current_app.logger.error(f"Не удалось извлечь текст из резюме: {resume_path}")
+            return
         
-        logger.info(f"Успешно извлечен текст из резюме, длина: {len(resume_data.get('text', ''))}")
+        # Очищаем текст резюме
+        cleaned_text = clean_resume_text(result['text'])
         
-        # Удаляем технические артефакты из текста
-        cleaned_text = clean_resume_text(resume_data.get("text", ""))
-        
-        # Обновляем текст резюме в БД
+        # Обновляем данные кандидата
         candidate.resume_text = cleaned_text
+        if 'structured_data' in result:
+            candidate.structured_resume_data = result['structured_data']
         
-        # Если есть структурированные данные, сохраняем их
-        if resume_data.get("structured_data"):
-            logger.info(f"Получены структурированные данные из резюме")
-            
-            # Проверяем наличие базовых ответов
-            if not candidate.base_answers:
-                candidate.base_answers = {}
-            
-            # Обновляем базовые ответы из структурированных данных
-            structured_data = resume_data["structured_data"]
-            
-            # Обновляем местоположение, если оно не было указано
-            if structured_data.get("personal_info", {}).get("location") and (
-                not candidate.base_answers.get("location") or 
-                candidate.base_answers.get("location") == "Не указано"
-            ):
-                candidate.base_answers["location"] = structured_data["personal_info"]["location"]
-                logger.info(f"Обновлено местоположение: {structured_data['personal_info']['location']}")
-            
-            # Обновляем опыт работы, если он не был указан
-            if structured_data.get("total_experience_years") and (
-                not candidate.base_answers.get("experience_years") or 
-                candidate.base_answers.get("experience_years") == "Не указано"
-            ):
-                candidate.base_answers["experience_years"] = structured_data["total_experience_years"]
-                logger.info(f"Обновлен опыт работы: {structured_data['total_experience_years']}")
-            
-            # Сохраняем структурированные данные в отдельное поле
-            candidate.structured_resume_data = structured_data
-        
-        # Сохраняем изменения в БД
+        # Сохраняем изменения
         db.session.commit()
-        logger.info(f"Сохранены данные резюме в БД для кандидата ID={candidate_id}")
         
         # Запускаем AI-анализ
         job_id = request_ai_analysis(candidate)
-        if not job_id:
-            logger.error(f"Не удалось запустить AI-анализ для кандидата ID={candidate_id}")
-            return False
-        
-        logger.info(f"Успешно обработано резюме и запущен AI-анализ (job_id={job_id}) для кандидата ID={candidate_id}")
-        return True
+        if job_id:
+            current_app.logger.info(f"Запущен AI-анализ для кандидата {candidate_id}, job_id: {job_id}")
+        else:
+            current_app.logger.error(f"Не удалось запустить AI-анализ для кандидата {candidate_id}")
         
     except Exception as e:
-        logger.error(f"Ошибка при обработке резюме и запуске анализа: {str(e)}", exc_info=True)
-        try:
-            db.session.rollback()
-        except Exception as db_error:
-            logger.error(f"Ошибка при откате транзакции: {str(db_error)}")
-        return False
+        current_app.logger.error(f"Ошибка при обработке резюме: {str(e)}")
+        db.session.rollback()
+        raise
 
 def clean_resume_text(text):
     """
@@ -1143,7 +1095,7 @@ def request_ai_analysis(candidate):
         - Несоответствие ожиданий по зарплате возможностям компании
         - Признаки "keyword stuffing" (искусственное добавление ключевых слов)
         - Потенциальные конфликты интересов
-        - Серьезные несоответствия между данными в резюме и ответами
+        - Серьезные несоответствия между данными в резюме и ответах
         - Признаки недостоверности предоставленной информации
         - Вероятность генерации ответов с помощью ИИ более 50%
         - Иные критические факторы, делающие найм невозможным
@@ -1626,7 +1578,6 @@ def request_ai_analysis(candidate):
             }
         
         # Сохраняем изменения в БД
-        from app import db
         db.session.commit()
         
         # Генерируем уникальный ID для задачи
@@ -1791,8 +1742,8 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
         2. Подробное описание задач с форматированием (маркированные списки, абзацы)
         3. Расширенные условия работы с форматированием
         4. Описание идеального кандидата (требования, навыки, опыт)
-        5. 7 профессиональных вопросов для кандидата
-        6. 7 вопросов на soft skills
+        5. 5 профессиональных вопросов для кандидата
+        6. 5 вопросов на soft skills
         
         Формат ответа должен быть в виде JSON:
         {{

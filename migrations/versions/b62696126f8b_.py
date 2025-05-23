@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 15e3bf271d49
+Revision ID: b62696126f8b
 Revises: 
-Create Date: 2025-05-21 16:45:46.726605
+Create Date: 2025-05-23 10:39:20.745549
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '15e3bf271d49'
+revision = 'b62696126f8b'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -48,15 +48,15 @@ def upgrade():
     sa.Column('order', sa.Integer(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('c_selection_stage',
+    op.create_table('c_selection_status',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.Text(), nullable=False),
+    sa.Column('code', sa.Text(), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('color', sa.String(length=20), nullable=False),
-    sa.Column('order', sa.Integer(), nullable=False),
-    sa.Column('type', sa.String(length=50), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('order', sa.Integer(), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('code')
     )
     op.create_table('c_user_status',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -91,6 +91,18 @@ def upgrade():
     sa.Column('name', sa.Text(), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('c_selection_stage',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.Text(), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('color', sa.Text(), nullable=False),
+    sa.Column('order', sa.Integer(), nullable=False),
+    sa.Column('is_standard', sa.Boolean(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('id_c_selection_status', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['id_c_selection_status'], ['c_selection_status.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('keywords',
@@ -159,13 +171,15 @@ def upgrade():
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user_selection_stages',
+    sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('stage_id', sa.Integer(), nullable=False),
     sa.Column('order', sa.Integer(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['stage_id'], ['c_selection_stage.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('user_id', 'stage_id')
+    sa.PrimaryKeyConstraint('user_id', 'stage_id', name='pk_user_selection_stages'),
+    sa.UniqueConstraint('stage_id')
     )
     op.create_table('vacancies',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -205,7 +219,7 @@ def upgrade():
     sa.Column('vacancy_id', sa.Integer(), nullable=False),
     sa.Column('full_name', sa.Text(), nullable=False),
     sa.Column('_email', sa.Text(), nullable=False),
-    sa.Column('_phone', sa.Text(), nullable=False),
+    sa.Column('_phone', sa.Text(), nullable=True),
     sa.Column('base_answers', sa.JSON(), nullable=False),
     sa.Column('vacancy_answers', sa.JSON(), nullable=False),
     sa.Column('soft_answers', sa.JSON(), nullable=False),
@@ -213,7 +227,7 @@ def upgrade():
     sa.Column('resume_text', sa.Text(), nullable=True),
     sa.Column('structured_resume_data', sa.JSON(), nullable=True),
     sa.Column('cover_letter', sa.Text(), nullable=True),
-    sa.Column('ai_match_percent', sa.Integer(), nullable=True),
+    sa.Column('ai_match_percent', sa.Float(), nullable=True),
     sa.Column('ai_pros', sa.Text(), nullable=True),
     sa.Column('ai_cons', sa.Text(), nullable=True),
     sa.Column('ai_recommendation', sa.Text(), nullable=True),
@@ -230,7 +244,7 @@ def upgrade():
     sa.Column('ai_answer_quality', sa.JSON(), nullable=True),
     sa.Column('ai_data_completeness', sa.JSON(), nullable=True),
     sa.Column('ai_analysis_data', sa.JSON(), nullable=True),
-    sa.Column('id_c_selection_stage', sa.Integer(), nullable=False),
+    sa.Column('id_user_selection_stage', sa.Integer(), nullable=False),
     sa.Column('id_c_rejection_reason', sa.Integer(), nullable=True),
     sa.Column('interview_date', sa.DateTime(timezone=True), nullable=True),
     sa.Column('hr_comment', sa.Text(), nullable=True),
@@ -239,14 +253,11 @@ def upgrade():
     sa.Column('tracking_code', sa.Text(), nullable=False),
     sa.Column('gender', sa.Text(), nullable=True),
     sa.ForeignKeyConstraint(['id_c_rejection_reason'], ['c_rejection_reason.id'], ),
-    sa.ForeignKeyConstraint(['id_c_selection_stage'], ['c_selection_stage.id'], ),
+    sa.ForeignKeyConstraint(['id_user_selection_stage'], ['user_selection_stages.stage_id'], ),
     sa.ForeignKeyConstraint(['vacancy_id'], ['vacancies.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tracking_code')
     )
-    with op.batch_alter_table('candidates', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_candidates__email'), ['_email'], unique=False)
-
     op.create_table('vacancy_industries',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('vacancy_id', sa.Integer(), nullable=False),
@@ -295,9 +306,6 @@ def downgrade():
     op.drop_table('candidate_skills')
     op.drop_table('vacancy_skills')
     op.drop_table('vacancy_industries')
-    with op.batch_alter_table('candidates', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_candidates__email'))
-
     op.drop_table('candidates')
     with op.batch_alter_table('vacancies', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_vacancies_title'))
@@ -319,6 +327,7 @@ def downgrade():
 
     op.drop_table('skills')
     op.drop_table('keywords')
+    op.drop_table('c_selection_stage')
     op.drop_table('skill_categories')
     op.drop_table('keyword_categories')
     with op.batch_alter_table('industries', schema=None) as batch_op:
@@ -326,7 +335,7 @@ def downgrade():
 
     op.drop_table('industries')
     op.drop_table('c_user_status')
-    op.drop_table('c_selection_stage')
+    op.drop_table('c_selection_status')
     op.drop_table('c_rejection_reason')
     op.drop_table('c_gender')
     op.drop_table('c_employment_type')

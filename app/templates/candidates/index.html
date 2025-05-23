@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <div class="container-fluid">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
@@ -40,36 +41,31 @@
     <div class="kanban-board">
         {% for stage in selection_stages %}
         <div class="kanban-column" data-stage-id="{{ stage.id }}">
-            <div class="kanban-column-header" style="background-color: {{ stage.color }}">
-                <h5>{{ stage.name }}</h5>
-                <span class="badge bg-light text-dark">{{ candidates|selectattr('id_c_selection_stage', 'eq', stage.id)|list|length }}</span>
+            <div class="kanban-column-header" style="background: {{ stage.color }};">
+                {{ stage.name }} <span class="kanban-count">{{ kanban_board[stage.id]|length }}</span>
             </div>
-            <div class="kanban-column-content">
-                {% for candidate in candidates %}
-                    {% if candidate.id_c_selection_stage == stage.id %}
+            <div class="kanban-column-body">
+                {% for candidate in kanban_board[stage.id] %}
+                <a href="{{ url_for('candidates.view', id=candidate.id) }}" class="kanban-card-link">
                     <div class="kanban-card" draggable="true" data-candidate-id="{{ candidate.id }}">
-                        <div class="card-header">
-                            <h6 class="mb-0">{{ candidate.full_name }}</h6>
+                        <div class="kanban-card-header">
+                            <div class="kanban-card-title">{{ candidate.full_name }}</div>
+                            <button class="kanban-view-btn" title="Просмотр" onclick="event.stopPropagation(); window.location.href='{{ url_for('candidates.view', id=candidate.id) }}'; return false;">
+                                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><line x1="10" y1="6" x2="10" y2="10"/><circle cx="10" cy="14" r="1"/></svg>
+                            </button>
                         </div>
-                        <div class="card-body">
-                            <p class="card-text">
-                                <small class="text-muted">Вакансия: {{ candidate.vacancy.title }}</small><br>
-                                <small class="text-muted">Создано: {{ candidate.created_at.strftime('%d.%m.%Y') }}</small>
-                            </p>
-                            {% if candidate.ai_match_percent is not none %}
-                            <div class="progress">
-                                <div class="progress-bar" role="progressbar" 
-                                     style="width: {{ candidate.ai_match_percent }}%; background-color: {{ stage.color }}"
-                                     aria-valuenow="{{ candidate.ai_match_percent }}" 
-                                     aria-valuemin="0" 
-                                     aria-valuemax="100">
-                                    {{ candidate.ai_match_percent }}%
-                                </div>
+                        <div class="kanban-card-info">
+                            <div class="kanban-card-vacancy">Вакансия: {{ candidate.vacancy_title }}</div>
+                            <div class="kanban-card-date">Создано: {{ candidate.created_at.strftime('%d.%m.%Y') }}</div>
+                        </div>
+                        <div class="kanban-card-progress">
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" style="width: {{ candidate.ai_match_percent or 0 }}%;"></div>
                             </div>
-                            {% endif %}
+                            <span class="progress-bar-label">{{ candidate.ai_match_percent or 0 }}%</span>
                         </div>
                     </div>
-                    {% endif %}
+                </a>
                 {% endfor %}
             </div>
         </div>
@@ -80,65 +76,124 @@
 <style>
 .kanban-board {
     display: flex;
-    gap: 1rem;
-    padding: 1rem;
-    overflow-x: auto;
-    min-height: calc(100vh - 200px);
+    gap: 24px;
+    align-items: stretch;
+    min-height: 600px;
 }
-
 .kanban-column {
-    flex: 1;
-    min-width: 300px;
     background: #f8f9fa;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    padding: 0 0 16px 0;
+    min-width: 320px;
+    max-width: 340px;
+    flex: 1 1 320px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
-
 .kanban-column-header {
-    padding: 1rem;
-    border-radius: 8px 8px 0 0;
-    color: white;
+    border-radius: 14px 14px 0 0;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1.1em;
+    padding: 16px 20px;
+    margin-bottom: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
-
-.kanban-column-content {
-    padding: 1rem;
-    min-height: 100px;
+.kanban-count {
+    background: rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 0.95em;
 }
-
+.kanban-column-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1 1 auto;
+    min-height: 400px;
+}
+.kanban-card-link {
+    text-decoration: none;
+    color: inherit;
+}
 .kanban-card {
-    background: white;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    margin-bottom: 1rem;
-    cursor: move;
-    transition: transform 0.2s, box-shadow 0.2s;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    padding: 18px 20px 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: box-shadow 0.15s, transform 0.15s;
+    cursor: pointer;
+    position: relative;
 }
-
 .kanban-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+    transform: translateY(-2px) scale(1.01);
 }
-
-.kanban-card.dragging {
-    opacity: 0.5;
-    transform: scale(0.95);
+.kanban-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
 }
-
-.kanban-column.drag-over {
+.kanban-card-title {
+    font-size: 1.08em;
+    font-weight: 600;
+    color: #2d3a4a;
+    line-height: 1.2;
+    flex: 1 1 auto;
+    word-break: break-word;
+}
+.kanban-view-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 8px;
+    cursor: pointer;
+    color: #6c757d;
+    transition: color 0.15s;
+}
+.kanban-view-btn:hover {
+    color: #007bff;
+}
+.kanban-card-info {
+    font-size: 0.98em;
+    color: #495057;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.kanban-card-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+.progress-bar-bg {
     background: #e9ecef;
-}
-
-.progress {
+    border-radius: 6px;
+    width: 100px;
     height: 8px;
-    margin-top: 0.5rem;
-    background-color: #e9ecef;
+    overflow: hidden;
+    flex-shrink: 0;
 }
-
-.progress-bar {
-    transition: width 0.3s ease;
+.progress-bar-fill {
+    background: #4caf50;
+    height: 100%;
+    border-radius: 6px 0 0 6px;
+    transition: width 0.3s;
+}
+.progress-bar-label {
+    font-size: 0.97em;
+    color: #4caf50;
+    font-weight: 500;
+    min-width: 36px;
 }
 </style>
 
@@ -183,42 +238,47 @@ document.addEventListener('DOMContentLoaded', function() {
         const candidateId = e.dataTransfer.getData('text/plain');
         const stageId = column.dataset.stageId;
         
+        // Получаем CSRF токен
+        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+        if (!csrfToken) {
+            console.error('CSRF токен не найден');
+            alert('Ошибка безопасности: CSRF токен не найден');
+            return;
+        }
+        
         // Отправляем AJAX-запрос для обновления этапа отбора
-        fetch('/api/candidates/update-stage', {
+        fetch('/candidates/api/candidates/update-stage', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                'X-CSRFToken': csrfToken.getAttribute('content')
             },
             body: JSON.stringify({
                 candidate_id: candidateId,
                 stage_id: stageId
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new TypeError("Ответ сервера не в формате JSON!");
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.success) {
-                // Перемещаем карточку в новую колонку
-                const card = document.querySelector(`[data-candidate-id="${candidateId}"]`);
-                const columnContent = column.querySelector('.kanban-column-content');
-                columnContent.appendChild(card);
-                
-                // Обновляем счетчики
-                updateCounters();
+            if (data.status === 'success') {
+                // Перезагружаем страницу для обновления данных
+                window.location.reload();
             } else {
-                alert(data.message || 'Произошла ошибка при обновлении этапа отбора');
+                alert(data.message || 'Ошибка при обновлении этапа отбора');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Произошла ошибка при обновлении этапа отбора');
-        });
-    }
-    
-    function updateCounters() {
-        columns.forEach(column => {
-            const count = column.querySelector('.kanban-column-content').children.length;
-            column.querySelector('.badge').textContent = count;
+            alert('Произошла ошибка при обновлении этапа отбора: ' + error.message);
         });
     }
 });

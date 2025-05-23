@@ -15,7 +15,7 @@ class CandidateCommentForm(FlaskForm):
 
 class CandidateStatusForm(FlaskForm):
     """Форма для изменения статуса кандидата"""
-    id_c_selection_stage = SelectField('Этап отбора',
+    stage_id = SelectField('Этап отбора',
         coerce=int,
         validators=[DataRequired()],
         render_kw={"class": "form-select"}

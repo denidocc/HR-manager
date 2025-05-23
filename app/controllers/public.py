@@ -4,7 +4,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort
 from flask_login import current_user
 from app import db
-from app.models import Vacancy, Candidate, Notification, SystemLog
+from app.models import Vacancy, Candidate, Notification, SystemLog, User_Selection_Stage
 from app.forms.application import ApplicationForm
 from app.utils.file_processing import save_resume, extract_text_from_resume
 from app.utils.ai_service import request_ai_analysis, process_resume_and_analyze
@@ -50,7 +50,7 @@ def vacancies():
     employment_types = C_Employment_Type.query.all()
     
     # Базовый запрос: только активные вакансии
-    query = Vacancy.query.filter_by(is_active=True)
+    query = Vacancy.query.filter_by(is_active=True).order_by(Vacancy.created_at.desc())
     
     # Применяем фильтры, если они указаны
     if search_query:
@@ -132,8 +132,7 @@ def apply(vacancy_id):
                 cast(Candidate._phone, sa.LargeBinary),
                 current_app.config['ENCRYPTION_KEY'],
                 current_app.config.get('ENCRYPTION_OPTIONS', '')
-            ) == form.phone.data,
-            Candidate.id_c_candidate_status != 3  # Разрешаем повторную подачу, если предыдущая была отклонена
+            ) == form.phone.data, # Разрешаем повторную подачу, если предыдущая была отклонена
         )
     ).first()
 
@@ -183,9 +182,21 @@ def apply(vacancy_id):
                 "gender": request.form.get('gender')
             }
             
+            # Получаем первый этап отбора для HR-менеджера
+            first_stage = User_Selection_Stage.query.filter_by(
+                user_id=vacancy.created_by,
+                is_active=True
+            ).order_by(User_Selection_Stage.order).first()
+            
+            if not first_stage:
+                flash('Ошибка: не найдены этапы отбора для HR-менеджера', 'danger')
+                return redirect(url_for('public_bp.vacancy_detail', id=vacancy_id))
+            
             # Создаем кандидата
             candidate = Candidate(
                 vacancy_id=vacancy.id,
+                user_id=vacancy.created_by,
+                stage_id=first_stage.stage_id,  # Используем ID этапа из user_selection_stages
                 full_name=form.full_name.data,
                 email=form.email.data,
                 phone=form.phone.data,
@@ -195,7 +206,6 @@ def apply(vacancy_id):
                 cover_letter=form.cover_letter.data,
                 resume_path=resume_path,
                 resume_text="{}",  # Пустой JSON для начала
-                id_c_candidate_status=0,
                 tracking_code=tracking_code,
                 gender=request.form.get('gender')
             )
@@ -222,7 +232,7 @@ def apply(vacancy_id):
             
             # Запускаем асинхронную обработку резюме и последующий AI-анализ
             if resume_path:
-                thread = Thread(target=process_resume_and_analyze, args=(candidate.id, resume_path))
+                thread = Thread(target=process_resume_async, args=(candidate.id, resume_path))
                 thread.daemon = True
                 thread.start()
             
@@ -286,11 +296,21 @@ def track_result():
 @profile_time
 def candidate_status(tracking_code):
     """Страница статуса заявки кандидата"""
+    # Получаем кандидата с расшифрованными полями и информацией о вакансии
     candidate = Candidate.query.filter_by(tracking_code=tracking_code).first_or_404()
+    
+    # Загружаем вакансию с этапами отбора
+    vacancy = Vacancy.query.get_or_404(candidate.vacancy_id)
+    
+    # Если у вакансии нет определенных этапов отбора, используем стандартные
+    if not vacancy.selection_stages_json:
+        # Можно здесь создать стандартные этапы для отображения
+        pass
     
     return render_template(
         'public/candidate_status.html',
         candidate=candidate,
+        vacancy=vacancy,
         title='Статус заявки'
     )
 

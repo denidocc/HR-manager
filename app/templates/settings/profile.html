@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Настройки профиля</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Панель управления</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('settings_bp.index') }}">Настройки</a></li>
+        <li class="breadcrumb-item active">Профиль</li>
+    </ol>
+    
+    <div class="row">
+        <div class="col-md-3">
+            <!-- Боковое меню настроек -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Разделы настроек</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="{{ url_for('settings_bp.profile') }}" class="list-group-item list-group-item-action active">
+                        <i class="fas fa-user-circle me-2"></i>Профиль
+                    </a>
+                    <a href="{{ url_for('settings_bp.selection_stages') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-tasks me-2"></i>Этапы отбора
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Личная информация</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('settings_bp.profile') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6 mb-3">
+                                <label for="full_name" class="form-label">ФИО</label>
+                                <input type="text" class="form-control" id="full_name" placeholder="Введите ФИО" name="full_name" value="{{ full_name }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" placeholder="Введите email" name="email" value="{{ email }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Телефон</label>
+                                <input type="text" class="form-control" id="phone" placeholder="+993XXXXXXXX" name="phone" value="{{ phone }}" required>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5>Изменение пароля</h5>
+                        <p class="text-muted">Оставьте поля пустыми, если не хотите менять пароль</p>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="new_password" class="form-label">Новый пароль</label>
+                                <input type="password" class="form-control" id="new_password" name="new_password" minlength="6">
+                                <div class="form-text">Минимум 6 символов</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="confirm_password" class="form-label">Подтверждение пароля</label>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Сохранить изменения
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Проверка совпадения паролей
+        const newPasswordInput = document.getElementById('new_password');
+        const confirmPasswordInput = document.getElementById('confirm_password');
+        const form = document.querySelector('form');
+        
+        form.addEventListener('submit', function(e) {
+            if (newPasswordInput.value && newPasswordInput.value !== confirmPasswordInput.value) {
+                e.preventDefault();
+                alert('Пароли не совпадают!');
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% endblock %} 

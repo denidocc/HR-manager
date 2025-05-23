@@ -3,26 +3,28 @@ var questions = [];
 var softQuestions = [];
 
 // Функция для добавления нового профессионального вопроса
-function addQuestion() {
+function addQuestion(text = '', type = 'text') {
     const newId = questions.length > 0 ? Math.max(...questions.map(q => q.id)) + 1 : 1;
     questions.push({
         id: newId,
-        text: '',
-        type: 'text',
+        text: text,
+        type: type,
         options: []
     });
     renderQuestions();
+    updateQuestionsJson();
 }
 
 // Функция для добавления нового вопроса на soft skills
-function addSoftQuestion() {
+function addSoftQuestion(text = '', type = 'text') {
     const newId = softQuestions.length > 0 ? Math.max(...softQuestions.map(q => q.id)) + 1 : 1;
     softQuestions.push({
         id: newId,
-        text: '',
-        type: 'text'
+        text: text,
+        type: type
     });
     renderSoftQuestions();
+    updateSoftQuestionsJson();
 }
 
 // Функция для отрисовки профессиональных вопросов
@@ -462,4 +464,22 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-}); 
+});
+
+// Функция для обновления JSON-поля с вопросами
+function updateQuestionsJson() {
+    const jsonField = document.getElementById('questionsJsonField');
+    if (jsonField) {
+        jsonField.value = JSON.stringify(questions);
+        console.log('Обновлено поле questionsJsonField:', jsonField.value);
+    }
+}
+
+// Функция для обновления JSON-поля с soft-вопросами
+function updateSoftQuestionsJson() {
+    const jsonField = document.getElementById('softQuestionsJsonField');
+    if (jsonField) {
+        jsonField.value = JSON.stringify(softQuestions);
+        console.log('Обновлено поле softQuestionsJsonField:', jsonField.value);
+    }
+} 

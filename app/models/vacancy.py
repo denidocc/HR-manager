@@ -15,6 +15,7 @@ class Vacancy(db.Model):
     ideal_profile: so.Mapped[str] = so.mapped_column(sa.Text, nullable=False)
     questions_json: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: [])
     soft_questions_json: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: [])
+    selection_stages_json: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: [], nullable=True)  # Этапы отбора для вакансии
     is_active: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=True)
     status: so.Mapped[str] = so.mapped_column(sa.Text, default='active')  # active, closed, archived
     location: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)  # город или регион
@@ -26,6 +27,12 @@ class Vacancy(db.Model):
     closed_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), nullable=True)  # дата закрытия вакансии
     created_by: so.Mapped[int] = so.mapped_column(sa.Integer, sa.ForeignKey('users.id'), nullable=True)
     company_values: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
+    
+    # Новые поля для отслеживания использования ИИ
+    is_ai_generated: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=False)  # Использовался ли ИИ для генерации
+    ai_generation_date: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True), nullable=True)  # Дата генерации с помощью ИИ
+    ai_generation_prompt: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)  # Запрос, использованный для генерации
+    ai_generation_metadata: so.Mapped[dict] = so.mapped_column(sa.JSON, nullable=True)  # Дополнительные метаданные о генерации
     
     # Отношения
     creator = so.relationship('User', back_populates='created_vacancies')
@@ -47,6 +54,7 @@ class Vacancy(db.Model):
             'ideal_profile': self.ideal_profile,
             'questions_json': self.questions_json,
             'soft_questions_json': self.soft_questions_json,
+            'selection_stages_json': self.selection_stages_json,
             'is_active': self.is_active,
             'status': self.status,
             'location': self.location,
@@ -56,5 +64,7 @@ class Vacancy(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'closed_at': self.closed_at.isoformat() if self.closed_at else None,
-            'creator': self.creator.full_name if self.creator else None
+            'creator': self.creator.full_name if self.creator else None,
+            'is_ai_generated': self.is_ai_generated,
+            'ai_generation_date': self.ai_generation_date.isoformat() if self.ai_generation_date else None
         } 

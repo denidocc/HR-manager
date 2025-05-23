@@ -11,7 +11,12 @@
                     <li class="breadcrumb-item active" aria-current="page">Создание вакансии</li>
                 </ol>
             </nav>
-            <h1 class="section-heading">Создание новой вакансии</h1>
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="section-heading">Создание новой вакансии</h1>
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#aiGeneratorModal">
+                    <i class="fas fa-magic me-1"></i> Нужна помощь при заполнении?
+                </button>
+            </div>
             <p class="text-muted">Заполните форму для создания новой вакансии. Поля, отмеченные звездочкой (*), обязательны для заполнения.</p>
         </div>
     </div>
@@ -140,8 +145,289 @@
         </div>
     </div>
 </div>
+
+<!-- Модальное окно для генерации вакансии с помощью ИИ -->
+<div class="modal fade" id="aiGeneratorModal" tabindex="-1" aria-labelledby="aiGeneratorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aiGeneratorModalLabel">Генерация вакансии</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Введите базовую информацию о вакансии, и мы поможем вам создать полное описание с профессиональными вопросами.</p>
+                
+                <form id="aiGeneratorForm">
+                    <div class="mb-3">
+                        <label for="ai_title" class="form-label">Название вакансии</label>
+                        <input type="text" class="form-control" id="ai_title" name="title" required>
+                        <div class="invalid-feedback" id="ai_title_error"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="ai_employment_type" class="form-label">Тип занятости</label>
+                        <select class="form-select" id="ai_employment_type" name="id_c_employment_type" required>
+                            <option value="">Выберите тип занятости</option>
+                            {% for id, name in form.id_c_employment_type.choices[1:] %}
+                                <option value="{{ id }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback" id="ai_employment_type_error"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="ai_description_tasks" class="form-label">Описание задач (кратко)</label>
+                        <textarea class="form-control" id="ai_description_tasks" name="description_tasks" rows="3" required></textarea>
+                        <div class="form-text">Кратко опишите основные задачи и обязанности сотрудника.</div>
+                        <div class="invalid-feedback" id="ai_description_tasks_error"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="ai_description_conditions" class="form-label">Условия работы (кратко)</label>
+                        <textarea class="form-control" id="ai_description_conditions" name="description_conditions" rows="3" required></textarea>
+                        <div class="form-text">Кратко опишите условия работы, график, местоположение и т.д.</div>
+                        <div class="invalid-feedback" id="ai_description_conditions_error"></div>
+                    </div>
+                </form>
+                
+                <div id="generationProgress" class="d-none">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p class="mt-2">Генерация вакансии... Это может занять до 30 секунд.</p>
+                    </div>
+                </div>
+                
+                <div id="generationResult" class="d-none">
+                    <div class="alert alert-success">
+                        <h5>Вакансия успешно сгенерирована!</h5>
+                        <p>Данные будут автоматически заполнены в форме создания вакансии.</p>
+                    </div>
+                </div>
+                
+                <div id="generationError" class="d-none">
+                    <div class="alert alert-danger">
+                        <h5>Ошибка при генерации вакансии</h5>
+                        <p id="errorMessage"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" id="generateVacancyBtn" class="btn btn-primary">Сгенерировать</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/vacancy_questions.js') }}"></script>
-{% endblock %} 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Обработчик для кнопки генерации вакансии
+        const generateBtn = document.getElementById('generateVacancyBtn');
+        const aiForm = document.getElementById('aiGeneratorForm');
+        const progressDiv = document.getElementById('generationProgress');
+        const resultDiv = document.getElementById('generationResult');
+        const errorDiv = document.getElementById('generationError');
+        const errorMessage = document.getElementById('errorMessage');
+        const modal = document.getElementById('aiGeneratorModal');
+        
+        generateBtn.addEventListener('click', function() {
+            // Очистка предыдущих результатов
+            resultDiv.classList.add('d-none');
+            errorDiv.classList.add('d-none');
+            
+            // Базовая валидация формы
+            const title = document.getElementById('ai_title').value;
+            const employmentType = document.getElementById('ai_employment_type').value;
+            const descriptionTasks = document.getElementById('ai_description_tasks').value;
+            const descriptionConditions = document.getElementById('ai_description_conditions').value;
+            
+            console.log('Тип занятости:', employmentType); // Для отладки
+            
+            let isValid = true;
+            
+            if (!title) {
+                document.getElementById('ai_title').classList.add('is-invalid');
+                document.getElementById('ai_title_error').textContent = 'Введите название вакансии';
+                isValid = false;
+            } else {
+                document.getElementById('ai_title').classList.remove('is-invalid');
+            }
+            
+            if (!employmentType) {
+                document.getElementById('ai_employment_type').classList.add('is-invalid');
+                document.getElementById('ai_employment_type_error').textContent = 'Выберите тип занятости';
+                isValid = false;
+            } else {
+                document.getElementById('ai_employment_type').classList.remove('is-invalid');
+            }
+            
+            if (!descriptionTasks) {
+                document.getElementById('ai_description_tasks').classList.add('is-invalid');
+                document.getElementById('ai_description_tasks_error').textContent = 'Введите описание задач';
+                isValid = false;
+            } else {
+                document.getElementById('ai_description_tasks').classList.remove('is-invalid');
+            }
+            
+            if (!descriptionConditions) {
+                document.getElementById('ai_description_conditions').classList.add('is-invalid');
+                document.getElementById('ai_description_conditions_error').textContent = 'Введите условия работы';
+                isValid = false;
+            } else {
+                document.getElementById('ai_description_conditions').classList.remove('is-invalid');
+            }
+            
+            if (!isValid) {
+                return;
+            }
+            
+            // Показываем индикатор загрузки
+            progressDiv.classList.remove('d-none');
+            generateBtn.disabled = true;
+            
+            // Собираем данные формы
+            const formData = new FormData(aiForm);
+            
+            // Отладка: выводим все данные формы в консоль
+            console.log('Отправляемые данные формы:');
+            for (const pair of formData.entries()) {
+                console.log(pair[0] + ': ' + pair[1]);
+            }
+            
+            // Отправляем запрос на сервер
+            fetch('{{ url_for("vacancies.generate_with_ai") }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Скрываем индикатор загрузки
+                progressDiv.classList.add('d-none');
+                
+                if (data.status === 'success') {
+                    // Показываем сообщение об успехе
+                    resultDiv.classList.remove('d-none');
+                    
+                    // Скрываем сообщение об ошибке, если оно было показано
+                    errorDiv.classList.add('d-none');
+                    
+                    // Заполняем форму создания вакансии данными от ИИ
+                    document.getElementById('title').value = data.data.title;
+                    
+                    // Находим правильный тип занятости в селекте по ID
+                    const employmentTypeSelect = document.getElementById('id_c_employment_type');
+                    const selectedEmploymentTypeId = document.getElementById('ai_employment_type').value;
+                    
+                    console.log('Выбранный тип занятости:', selectedEmploymentTypeId);
+                    
+                    // Устанавливаем значение типа занятости
+                    if (selectedEmploymentTypeId) {
+                        // Устанавливаем значение по ID
+                        for (let i = 0; i < employmentTypeSelect.options.length; i++) {
+                            if (employmentTypeSelect.options[i].value === selectedEmploymentTypeId) {
+                                employmentTypeSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    } else {
+                        // Если тип занятости не выбран, выбираем первый элемент (пустой)
+                        employmentTypeSelect.selectedIndex = 0;
+                    }
+                    
+                    // Заполняем текстовые поля
+                    document.getElementById('description_tasks').value = data.data.description_tasks;
+                    document.getElementById('description_conditions').value = data.data.description_conditions;
+                    document.getElementById('ideal_profile').value = data.data.ideal_profile;
+                    
+                    // Очищаем контейнеры вопросов перед добавлением новых
+                    document.getElementById('questionsContainer').innerHTML = '';
+                    document.getElementById('softQuestionsContainer').innerHTML = '';
+                    
+                    // Сбрасываем глобальные массивы вопросов
+                    questions = [];
+                    softQuestions = [];
+                    
+                    // Заполняем профессиональные вопросы
+                    if (data.data.questions && data.data.questions.length > 0) {
+                        // Добавляем новые вопросы (максимум 7)
+                        const maxQuestions = Math.min(data.data.questions.length, 7);
+                        for (let i = 0; i < maxQuestions; i++) {
+                            addQuestion(data.data.questions[i].text, 'text');
+                        }
+                    }
+                    
+                    // Заполняем вопросы на soft skills
+                    if (data.data.soft_questions && data.data.soft_questions.length > 0) {
+                        // Добавляем новые вопросы (максимум 7)
+                        const maxSoftQuestions = Math.min(data.data.soft_questions.length, 7);
+                        for (let i = 0; i < maxSoftQuestions; i++) {
+                            addSoftQuestion(data.data.soft_questions[i].text, 'text');
+                        }
+                    }
+                    
+                    // Закрываем модальное окно через 2 секунды
+                    setTimeout(() => {
+                        const bsModal = bootstrap.Modal.getInstance(modal);
+                        bsModal.hide();
+                    }, 2000);
+                } else {
+                    // Показываем сообщение об ошибке
+                    errorDiv.classList.remove('d-none');
+                    
+                    // Скрываем сообщение об успехе, если оно было показано
+                    resultDiv.classList.add('d-none');
+                    
+                    // Если есть детали ошибок, отображаем их
+                    if (data.errors) {
+                        let errorDetails = '';
+                        for (const field in data.errors) {
+                            errorDetails += `${field}: ${data.errors[field].join(', ')}<br>`;
+                            
+                            // Подсвечиваем поля с ошибками
+                            const fieldElement = document.getElementById(`ai_${field}`);
+                            if (fieldElement) {
+                                fieldElement.classList.add('is-invalid');
+                                const errorElement = document.getElementById(`ai_${field}_error`);
+                                if (errorElement) {
+                                    errorElement.innerHTML = data.errors[field].join(', ');
+                                }
+                            }
+                        }
+                        errorMessage.innerHTML = errorDetails || data.message || 'Произошла ошибка при генерации вакансии';
+                    } else {
+                        errorMessage.textContent = data.message || 'Произошла ошибка при генерации вакансии';
+                    }
+                }
+                
+                // Разблокируем кнопку
+                generateBtn.disabled = false;
+            })
+            .catch(error => {
+                // Скрываем индикатор загрузки
+                progressDiv.classList.add('d-none');
+                
+                // Показываем сообщение об ошибке
+                errorDiv.classList.remove('d-none');
+                
+                // Скрываем сообщение об успехе, если оно было показано
+                resultDiv.classList.add('d-none');
+                
+                errorMessage.textContent = 'Произошла ошибка при отправке запроса';
+                
+                // Разблокируем кнопку
+                generateBtn.disabled = false;
+                
+                console.error('Error:', error);
+            });
+        });
+    });
+</script>
+{% endblock %}

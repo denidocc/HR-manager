@@ -4,6 +4,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm as so
 from app import db, login_manager, argon2
 from app.utils.encryption import encrypted_property
+from app.models.user_selection_stages import User_Selection_Stage
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -32,6 +33,8 @@ class User(UserMixin, db.Model):
     c_user_status = so.relationship('C_User_Status', back_populates='users')
     created_vacancies = so.relationship('Vacancy', back_populates='creator')
     system_logs = so.relationship('SystemLog', back_populates='user')
+    selection_stages = so.relationship('User_Selection_Stage', back_populates='user')
+    candidates = so.relationship('Candidate', back_populates='user', overlaps="user_selection_stage")
     
     def __repr__(self):
         return f'<User {self._email}>'
@@ -42,11 +45,44 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return argon2.check_password_hash(self.password_hash, password)
     
+    @property
     def is_hr(self):
         return self.role == 'hr'
     
+    @property
     def is_candidate(self):
         return self.role == 'candidate'
+    
+    def get_selection_stages(self):
+        """Получает этапы отбора пользователя, или стандартные если у него их нет"""
+        from app.models.c_selection_stage import C_Selection_Stage
+        
+        # Получаем этапы через связь User_Selection_Stage
+        user_stages = User_Selection_Stage.query.filter_by(user_id=self.id).order_by(User_Selection_Stage.order).all()
+        
+        if user_stages:
+            # Возвращаем этапы отбора из связей
+            return [stage.selection_stage for stage in user_stages]
+        
+        # Если у пользователя нет собственных этапов, возвращаем стандартные
+        return C_Selection_Stage.query.filter_by(is_standard=True).order_by(C_Selection_Stage.order).all()
+    
+    def initialize_default_stages(self):
+        """Инициализирует стандартные этапы отбора для нового пользователя"""
+        from app.models.c_selection_stage import C_Selection_Stage
+        from app.models.user_selection_stages import User_Selection_Stage
+        
+        if not self.selection_stages:
+            default_stages = C_Selection_Stage.query.filter_by(is_standard=True).order_by(C_Selection_Stage.order).all()
+            for stage in default_stages:
+                user_stage = User_Selection_Stage(
+                    user_id=self.id,
+                    stage_id=stage.id,
+                    order=stage.order,
+                    is_active=True
+                )
+                db.session.add(user_stage)
+            db.session.commit()
     
     def to_dict(self):
         return {

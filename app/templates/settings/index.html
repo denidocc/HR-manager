@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Настройки</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Панель управления</a></li>
+        <li class="breadcrumb-item active">Настройки</li>
+    </ol>
+    
+    <div class="row">
+        <div class="col-md-3">
+            <!-- Боковое меню настроек -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Разделы настроек</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="{{ url_for('settings_bp.profile') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-user-circle me-2"></i>Профиль
+                    </a>
+                    <a href="{{ url_for('settings_bp.selection_stages') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-tasks me-2"></i>Этапы отбора
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Настройки системы</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-user-circle fa-3x mb-3 text-primary"></i>
+                                    <h5 class="card-title">Настройки профиля</h5>
+                                    <p class="card-text">Обновите свои личные данные, контактную информацию и пароль.</p>
+                                    <a href="{{ url_for('settings_bp.profile') }}" class="btn btn-primary">Перейти</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-tasks fa-3x mb-3 text-primary"></i>
+                                    <h5 class="card-title">Этапы отбора</h5>
+                                    <p class="card-text">Настройте этапы отбора кандидатов для вашей компании.</p>
+                                    <a href="{{ url_for('settings_bp.selection_stages') }}" class="btn btn-primary">Перейти</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

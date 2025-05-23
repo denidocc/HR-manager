@@ -15,7 +15,7 @@ class VacancyForm(FlaskForm):
     
     id_c_employment_type = SelectField('Тип занятости', 
         validators=[DataRequired(message='Выберите тип занятости')], 
-        coerce=int
+        coerce=lambda x: int(x) if x is not None and x != '' else None
     )
     
     description_tasks = TextAreaField('Описание задач', validators=[
@@ -52,4 +52,40 @@ class VacancyForm(FlaskForm):
                     if not isinstance(q, dict) or 'id' not in q or 'text' not in q:
                         raise ValidationError('Некорректный формат вопроса')
             except json.JSONDecodeError:
-                raise ValidationError('Некорректный JSON-формат') 
+                raise ValidationError('Некорректный JSON-формат')
+                
+    def validate_id_c_employment_type(self, field):
+        """Валидация выбора типа занятости"""
+        if field.data is None:
+            raise ValidationError('Выберите тип занятости')
+        # Значение 0 теперь допустимо, так как это "Неизвестно"
+
+class VacancyAIGeneratorForm(FlaskForm):
+    """Мини-форма для генерации вакансии с помощью ИИ"""
+    title = StringField('Название вакансии', validators=[
+        DataRequired(message='Введите название вакансии'),
+        Length(min=3, max=100, message='Название должно содержать от 3 до 100 символов')
+    ])
+    
+    id_c_employment_type = SelectField('Тип занятости', 
+        validators=[DataRequired(message='Выберите тип занятости')],
+        coerce=lambda x: int(x) if x is not None and x != '' else None
+    )
+    
+    description_tasks = TextAreaField('Описание задач (кратко)', validators=[
+        DataRequired(message='Введите краткое описание задач'),
+        Length(min=20, message='Описание задач должно содержать минимум 20 символов')
+    ])
+    
+    description_conditions = TextAreaField('Условия работы (кратко)', validators=[
+        DataRequired(message='Введите краткие условия работы'),
+        Length(min=20, message='Условия работы должны содержать минимум 20 символов')
+    ])
+    
+    submit = SubmitField('Сгенерировать вакансию')
+    
+    def validate_id_c_employment_type(self, field):
+        """Валидация выбора типа занятости"""
+        if field.data is None:
+            raise ValidationError('Выберите тип занятости')
+        # Значение 0 теперь допустимо, так как это "Неизвестно"

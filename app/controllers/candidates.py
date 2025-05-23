@@ -4,8 +4,8 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_from_directory, abort, current_app
 from flask_login import login_required, current_user
 from app import db
-from app.models import Candidate, Vacancy, C_Candidate_Status, SystemLog, Notification
-from app.forms.candidate import CandidateCommentForm, CandidateStatusForm
+from app.models import Candidate, Vacancy, SystemLog, Notification, C_Selection_Stage
+from app.forms.candidate import CandidateCommentForm
 from app.utils.ai_service import request_ai_analysis
 from app.utils.email_service import send_status_change_notification
 from app.utils.decorators import profile_time
@@ -18,10 +18,12 @@ from sqlalchemy import desc, func, cast
 import sqlalchemy as sa
 import fitz  # PyMuPDF для работы с PDF
 import numpy as np
-import cv2
 from openai import OpenAI
 import base64
 import docx
+from app.models.c_rejection_reason import C_Rejection_Reason
+from app.models.user_selection_stages import User_Selection_Stage
+from app.controllers.auth import hr_required
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
@@ -32,11 +34,16 @@ candidates_bp = Blueprint('candidates', __name__, url_prefix='/candidates')
 @profile_time
 @login_required
 def index():
-    """Список всех кандидатов HR-менеджера"""
+    """Список всех кандидатов HR-менеджера в формате канбан-доски"""
     # Получаем параметры фильтра
     vacancy_id = request.args.get('vacancy_id', type=int)
-    status_id = request.args.get('status_id', type=int)
     sort_by = request.args.get('sort_by', 'date')
+    
+    # Получаем этапы отбора текущего HR-менеджера
+    selection_stages = current_user.get_selection_stages()
+    
+    # Получаем все вакансии HR-менеджера для фильтра
+    vacancies = Vacancy.query.filter_by(created_by=current_user.id).all()
     
     # Базовый запрос с дешифровкой полей email и phone
     query = db.session.query(
@@ -55,25 +62,24 @@ def index():
         ).label('phone'),
         Candidate.created_at,
         Candidate.ai_match_percent,
-        Candidate.id_c_candidate_status,
+        Candidate.stage_id,
         Vacancy.title.label('vacancy_title'),
         Vacancy.id.label('vacancy_id'),
-        C_Candidate_Status.name.label('status_name'),
-        C_Candidate_Status.color_code.label('status_color')
+        C_Selection_Stage.name.label('stage_name'),
+        C_Selection_Stage.color.label('stage_color'),
     ).join(
         Vacancy, Candidate.vacancy_id == Vacancy.id
     ).join(
-        C_Candidate_Status, Candidate.id_c_candidate_status == C_Candidate_Status.id
+        Candidate.user_selection_stage
+    ).join(
+        C_Selection_Stage, Candidate.user_selection_stage.has(stage_id=C_Selection_Stage.id)
     ).filter(
         Vacancy.created_by == current_user.id
     )
     
-    # Применяем фильтры
+    # Применяем фильтр по вакансии
     if vacancy_id:
         query = query.filter(Candidate.vacancy_id == vacancy_id)
-    
-    if status_id:
-        query = query.filter(Candidate.id_c_candidate_status == status_id)
     
     # Сортировка
     if sort_by == 'date':
@@ -83,45 +89,24 @@ def index():
     else:
         query = query.order_by(Candidate.created_at.desc())
     
-    # Выполняем запрос
-    candidates_data = query.all()
+    # Получаем кандидатов
+    candidates = query.all()
     
-    # Преобразуем данные в список объектов для шаблона
-    candidates = []
-    for c in candidates_data:
-        candidate = {
-            'id': c.id,
-            'vacancy_id': c.vacancy_id,
-            'vacancy': {
-                'id': c.vacancy_id,
-                'title': c.vacancy_title
-            },
-            'full_name': c.full_name,
-            'email': c.email,
-            'phone': c.phone,
-            'created_at': c.created_at,
-            'ai_match_percent': c.ai_match_percent,
-            'id_c_candidate_status': c.id_c_candidate_status,
-            'c_candidate_status': {
-                'name': c.status_name,
-                'color_code': c.status_color
-            }
-        }
-        candidates.append(candidate)
+    # Создаем канбан-доску
+    kanban_board = {stage.id: [] for stage in selection_stages}
     
-    # Получаем все вакансии HR-менеджера для фильтра
-    vacancies = Vacancy.query.filter_by(created_by=current_user.id).all()
-    
-    # Получаем все статусы кандидатов для фильтра
-    statuses = C_Candidate_Status.query.all()
+    # Распределяем кандидатов по этапам
+    for candidate in candidates:
+        if candidate.stage_id in kanban_board:
+            kanban_board[candidate.stage_id].append(candidate)
     
     return render_template(
         'candidates/index.html',
         candidates=candidates,
+        kanban_board=kanban_board,
+        selection_stages=selection_stages,
         vacancies=vacancies,
-        statuses=statuses,
         vacancy_id=vacancy_id,
-        status_id=status_id,
         sort_by=sort_by,
         title='Кандидаты'
     )
@@ -164,6 +149,7 @@ def view(id):
         Candidate.created_at,
         Candidate.updated_at,
         Candidate.tracking_code,
+        Candidate.id_c_rejection_reason,
         func.pgp_sym_decrypt(
             cast(Candidate._email, sa.LargeBinary),
             current_app.config['ENCRYPTION_KEY'],
@@ -174,18 +160,27 @@ def view(id):
             current_app.config['ENCRYPTION_KEY'],
             current_app.config.get('ENCRYPTION_OPTIONS', '')
         ).label('phone'),
-        Candidate.id_c_candidate_status,
-        Vacancy.title.label('vacancy_title')
+        Candidate.stage_id,
+        Vacancy.title.label('vacancy_title'),
+        C_Selection_Stage.name.label('status_name'),
+        C_Selection_Stage.color.label('status_color')
     ).join(
         Vacancy, Candidate.vacancy_id == Vacancy.id
+    ).join(
+        C_Selection_Stage, Candidate.stage_id == C_Selection_Stage.id
+    ).join(
+        User_Selection_Stage, C_Selection_Stage.id == User_Selection_Stage.stage_id
     ).filter(Candidate.id == id).first_or_404()
     
     # Получаем обычную модель кандидата для связей
     candidate = Candidate.query.get_or_404(id)
     
-    # Получаем данные о вакансии и статусе
+    # Получаем данные о вакансии и этапе
     vacancy = Vacancy.query.get(candidate_data.vacancy_id)
-    status = C_Candidate_Status.query.get(candidate_data.id_c_candidate_status)
+    stage = C_Selection_Stage.query.get(candidate_data.stage_id)
+    
+    # Получаем причины отклонения
+    rejection_reasons = C_Rejection_Reason.query.filter_by(is_active=True).order_by(C_Rejection_Reason.order).all()
     
     # Обрабатываем вопросы и ответы чтобы отобразить корректные данные
     formatted_vacancy_answers = {}
@@ -251,8 +246,12 @@ def view(id):
         'created_at': candidate_data.created_at,
         'updated_at': candidate_data.updated_at,
         'tracking_code': candidate_data.tracking_code,
-        'c_candidate_status': status,
-        'id_c_candidate_status': candidate_data.id_c_candidate_status,
+        'selection_stage': {
+            'name': candidate_data.status_name,
+            'color': candidate_data.status_color
+        },
+        'stage_id': candidate_data.stage_id,
+        'id_c_rejection_reason': candidate_data.id_c_rejection_reason,
         'notifications': candidate.notifications  # Берем из оригинальной модели
     }
     
@@ -261,8 +260,8 @@ def view(id):
         flash('У вас нет доступа к просмотру этого кандидата', 'danger')
         return redirect(url_for('candidates.index'))
     
-    # Получаем статусы для формы изменения статуса
-    statuses = C_Candidate_Status.query.all()
+    # Получаем этапы для формы изменения этапа
+    stages = C_Selection_Stage.query.all()
     
     # Определяем путь к файлу резюме (если есть)
     resume_file_url = None
@@ -272,104 +271,62 @@ def view(id):
     return render_template(
         'candidates/view.html',
         candidate=candidate_view,
-        statuses=statuses,
+        stages=stages,
+        rejection_reasons=rejection_reasons,
         resume_file_url=resume_file_url,
         title=f'Кандидат: {candidate_data.full_name}'
     )
 
-@candidates_bp.route('/<int:id>/change_status', methods=['POST'])
+@candidates_bp.route('/change_status/<int:id>', methods=['POST'])
 @profile_time
 @login_required
 def change_status(id):
-    """Изменение статуса кандидата"""
+    """Изменение этапа отбора кандидата"""
     candidate = Candidate.query.get_or_404(id)
     
-    # Проверяем, принадлежит ли вакансия текущему HR-менеджеру
-    if candidate.vacancy.created_by != current_user.id:
-        flash('У вас нет доступа к редактированию этого кандидата', 'danger')
+    # Проверяем, что кандидат принадлежит вакансии текущего HR
+    if not candidate.vacancy or candidate.vacancy.creator != current_user.id:
+        flash('У вас нет доступа к этому кандидату', 'danger')
         return redirect(url_for('candidates.index'))
     
-    # Получаем новый статус из формы
-    new_status_id = request.form.get('status_id', type=int)
-    interview_date_str = request.form.get('interview_date')
-    
-    if not new_status_id:
-        flash('Не указан новый статус', 'danger')
+    stage_id = request.form.get('stage_id', type=int)
+    if not stage_id:
+        flash('Не указан этап отбора', 'danger')
         return redirect(url_for('candidates.view', id=id))
     
-    # Получаем статус из БД для проверки
-    status = C_Candidate_Status.query.get(new_status_id)
-    if not status:
-        flash('Указан некорректный статус', 'danger')
+    # Проверяем, что этап принадлежит текущему HR
+    stage = C_Selection_Stage.query.get_or_404(stage_id)
+    if stage.id_hr != current_user.id:
+        flash('У вас нет доступа к этому этапу отбора', 'danger')
         return redirect(url_for('candidates.view', id=id))
     
-    # Проверка на понижение статуса
-    old_status_id = candidate.id_c_candidate_status
+    # Обновляем этап отбора
+    candidate.stage_id = stage_id
     
-    # Проверяем, не пытаемся ли понизить статус
-    if new_status_id < old_status_id:
-        flash('Нельзя понижать статус кандидата', 'danger')
-        return redirect(url_for('candidates.view', id=id))
-    
-    # Проверяем переход между финальными статусами (Принят/Отклонен)
-    if (old_status_id == 4 and new_status_id == 5) or (old_status_id == 5 and new_status_id == 4):
-        flash('Нельзя менять статус между "Принят" и "Отклонен"', 'danger')
-        return redirect(url_for('candidates.view', id=id))
-    
-    # Обновляем статус
-    candidate.id_c_candidate_status = new_status_id
-    
-    # Если новый статус "Собеседование", то обновляем дату собеседования
-    if new_status_id == 2 and interview_date_str:  # ID статуса "Назначено интервью" = 2
-        try:
-            interview_date = datetime.strptime(interview_date_str, '%Y-%m-%dT%H:%M')
-            candidate.interview_date = interview_date
-        except ValueError:
-            flash('Некорректный формат даты собеседования', 'warning')
-    
-    # Создаем уведомление о смене статуса
-    notification_type = "status_update"
-    message = f"Статус вашей заявки на вакансию '{candidate.vacancy.title}' изменен на '{status.name}'."
-    
-    # Специальные типы уведомлений в зависимости от статуса
-    if new_status_id == 1:  # Рассмотрение резюме
-        notification_type = "candidate_review"
-        message = f"Ваше резюме на вакансию '{candidate.vacancy.title}' рассмотривается."
-    elif new_status_id == 2:  # Назначено интервью
-        notification_type = "interview_invitation"
-        date_str = candidate.interview_date.strftime('%d.%m.%Y %H:%M') if candidate.interview_date else "будет согласована дополнительно"
-        message = f"Приглашаем вас на собеседование по вакансии '{candidate.vacancy.title}'. Дата: {date_str}."
-    elif new_status_id == 3:  # Ожидает решения
-        notification_type = "waiting_for_decision"
-        message = f"Ожидайте решения по вакансии '{candidate.vacancy.title}'."
-    elif new_status_id == 5:  # Отказ
-        notification_type = "rejection"
-        message = f"К сожалению, ваша кандидатура на вакансию '{candidate.vacancy.title}' была отклонена. Благодарим за интерес к нашей компании."
-    elif new_status_id == 4:  # Принят
-        notification_type = "offer"
-        message = f"Поздравляем! Вы приняты на работу на позицию '{candidate.vacancy.title}'. Ожидаем вашего ответа."
-    
-    # Создаем новое уведомление
-    notification = Notification(
-        candidate_id=candidate.id,
-        type=notification_type,
-        message=message,
-        created_at=datetime.now()
-    )
-    db.session.add(notification)
-    
-    # Сохраняем изменения в БД
-    db.session.commit()
-    
-    # Логируем изменение статуса
+    # Логируем изменение
     SystemLog.log(
-        event_type="candidate_status_change",
-        description=f"Изменен статус кандидата ID={id} с '{old_status_id}' на '{new_status_id}'",
+        event_type="candidate_stage_change",
+        description=f"Изменен этап отбора кандидата ID={id} на '{stage.name}'",
         user_id=current_user.id,
         ip_address=request.remote_addr
     )
     
-    flash(f'Статус кандидата успешно изменен на "{status.name}"', 'success')
+    # Создаем уведомление
+    notification = Notification(
+        user_id=current_user.id,
+        title='Изменение этапа отбора',
+        message=f'Кандидат {candidate.full_name} переведен на этап "{stage.name}"',
+        type='info'
+    )
+    db.session.add(notification)
+    
+    try:
+        db.session.commit()
+        flash('Этап отбора успешно обновлен', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка при обновлении этапа отбора: {str(e)}', 'danger')
+    
     return redirect(url_for('candidates.view', id=id))
 
 @candidates_bp.route('/<int:id>/add_comment', methods=['POST'])
@@ -572,7 +529,7 @@ def track(tracking_code):
         Candidate.full_name,
         Candidate.base_answers,
         Candidate.tracking_code,
-        Candidate.id_c_candidate_status,
+        Candidate.stage_id,
         Candidate.interview_date,
         Candidate.created_at,
         func.pgp_sym_decrypt(
@@ -586,12 +543,12 @@ def track(tracking_code):
             current_app.config.get('ENCRYPTION_OPTIONS', '')
         ).label('phone'),
         Vacancy.title.label('vacancy_title'),
-        C_Candidate_Status.name.label('status_name'),
-        C_Candidate_Status.color_code.label('status_color')
+        C_Selection_Stage.name.label('status_name'),
+        C_Selection_Stage.color.label('status_color')
     ).join(
         Vacancy, Candidate.vacancy_id == Vacancy.id
     ).join(
-        C_Candidate_Status, Candidate.id_c_candidate_status == C_Candidate_Status.id
+        C_Selection_Stage, Candidate.stage_id == C_Selection_Stage.id
     ).filter(
         Candidate.tracking_code == tracking_code
     ).first_or_404()
@@ -612,12 +569,12 @@ def track(tracking_code):
         },
         'base_answers': candidate_data.base_answers,
         'tracking_code': candidate_data.tracking_code,
-        'id_c_candidate_status': candidate_data.id_c_candidate_status,
+        'stage_id': candidate_data.stage_id,
         'interview_date': candidate_data.interview_date,
         'created_at': candidate_data.created_at,
-        'c_candidate_status': {
+        'selection_stage': {
             'name': candidate_data.status_name,
-            'color_code': candidate_data.status_color
+            'color': candidate_data.status_color
         },
         'notifications': candidate.notifications
     }
@@ -653,14 +610,14 @@ def api_candidates():
         ).label('phone'),
         Candidate.created_at,
         Candidate.ai_match_percent,
-        Candidate.id_c_candidate_status,
+        Candidate.stage_id,
         Vacancy.title.label('vacancy_title'),
-        C_Candidate_Status.name.label('status_name'),
-        C_Candidate_Status.color_code.label('status_color')
+        C_Selection_Stage.name.label('status_name'),
+        C_Selection_Stage.color.label('status_color')
     ).join(
         Vacancy, Candidate.vacancy_id == Vacancy.id
     ).join(
-        C_Candidate_Status, Candidate.id_c_candidate_status == C_Candidate_Status.id
+        C_Selection_Stage, Candidate.stage_id == C_Selection_Stage.id
     ).filter(
         Vacancy.created_by == current_user.id
     )
@@ -670,7 +627,7 @@ def api_candidates():
         query = query.filter(Candidate.vacancy_id == vacancy_id)
     
     if status_id:
-        query = query.filter(Candidate.id_c_candidate_status == status_id)
+        query = query.filter(Candidate.stage_id == status_id)
     
     # Выполняем запрос
     candidates = query.order_by(Candidate.created_at.desc()).all()
@@ -870,3 +827,117 @@ def reprocess_resume(id):
         
         flash(f'Ошибка при обработке резюме: {str(e)}', 'danger')
         return redirect(url_for('candidates.view', id=id))
+
+@candidates_bp.route('/<int:id>/update-status', methods=['POST'])
+@login_required
+@hr_required
+def update_status(id):
+    """Обновление статуса кандидата"""
+    try:
+        candidate = Candidate.query.get_or_404(id)
+        new_status_id = request.form.get('status_id', type=int)
+        rejection_reason_id = request.form.get('rejection_reason_id', type=int)
+        
+        if new_status_id:
+            candidate.stage_id = new_status_id
+            
+            # Если статус "Отклонен", проверяем наличие причины
+            if new_status_id == 5:
+                if not rejection_reason_id:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Необходимо указать причину отклонения'
+                    }), 400
+                candidate.id_c_rejection_reason = rejection_reason_id
+            else:
+                candidate.id_c_rejection_reason = None
+        
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Ошибка при обновлении статуса кандидата: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Произошла ошибка при обновлении статуса'
+        }), 500
+
+@candidates_bp.route('/api/candidates/update-stage', methods=['POST'])
+@login_required
+@hr_required
+def update_candidate_stage():
+    """API-метод для обновления этапа кандидата при перетаскивании в канбане"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'candidate_id' not in data or 'stage_id' not in data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Недостаточно данных для обновления'
+            }), 400
+        
+        candidate_id = data['candidate_id']
+        new_stage_id = data['stage_id']
+        
+        # Проверяем существование кандидата и этапа
+        candidate = Candidate.query.get(candidate_id)
+        stage = C_Selection_Stage.query.get(new_stage_id)
+        
+        if not candidate:
+            return jsonify({
+                'status': 'error',
+                'message': 'Кандидат не найден'
+            }), 404
+            
+        if not stage:
+            return jsonify({
+                'status': 'error',
+                'message': 'Этап не найден'
+            }), 404
+            
+        # Проверяем, принадлежит ли вакансия текущему пользователю
+        if candidate.vacancy.created_by != current_user.id:
+            return jsonify({
+                'status': 'error',
+                'message': 'У вас нет доступа к этому кандидату'
+            }), 403
+            
+        # Обновляем этап кандидата
+        old_stage = candidate.stage_id
+        candidate.stage_id = new_stage_id
+        candidate.updated_at = datetime.now(timezone.utc)
+        
+        # Логируем изменение
+        SystemLog.log(
+            event_type="candidate_stage_change",
+            description=f"Изменен этап отбора кандидата ID={candidate_id} на '{stage.name}'",
+            user_id=current_user.id,
+            ip_address=request.remote_addr
+        )
+        
+        # Создаем уведомление
+        notification = Notification(
+            candidate_id=candidate.id,
+            type="status_update",
+            message=f"Статус кандидата {candidate.full_name} изменен на '{stage.name}'"
+        )
+        db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Этап кандидата успешно обновлен',
+            'candidate_id': candidate_id,
+            'stage_id': new_stage_id,
+            'stage_name': stage.name,
+            'updated_at': candidate.updated_at.isoformat()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при обновлении этапа кандидата: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Произошла ошибка: {str(e)}'
+        }), 500

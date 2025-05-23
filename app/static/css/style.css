@@ -740,4 +740,50 @@ h1 {
 
 .ai-score-value.over-bar {
     color: #fff;
+}
+
+/* Стили для форматированного текста в вакансиях */
+.formatted-text {
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
+.formatted-text ul, 
+.formatted-text ol {
+    padding-left: 20px;
+    margin-bottom: 1rem;
+}
+
+.formatted-text p {
+    margin-bottom: 1rem;
+}
+
+.formatted-text h1, 
+.formatted-text h2, 
+.formatted-text h3, 
+.formatted-text h4, 
+.formatted-text h5, 
+.formatted-text h6 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.formatted-text hr {
+    margin: 1rem 0;
+}
+
+.formatted-text blockquote {
+    border-left: 3px solid #dee2e6;
+    padding-left: 1rem;
+    margin-left: 0;
+    color: #6c757d;
+}
+
+/* Стили для модального окна генерации вакансии */
+#aiGeneratorModal .modal-dialog {
+    max-width: 700px;
+}
+
+#generationProgress {
+    min-height: 150px;
 } 

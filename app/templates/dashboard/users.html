@@ -87,11 +87,13 @@
                                         {% if user.id_c_user_status == 2 %}
                                         <div class="d-flex justify-content-around">
                                             <form method="post" action="{{ url_for('dashboard.approve_user', user_id=user.id) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button type="submit" class="btn btn-sm btn-success btn-table-action" title="Подтвердить">
                                                     <i class="fas fa-check"></i>
                                                 </button>
                                             </form>
                                             <form method="post" action="{{ url_for('dashboard.reject_user', user_id=user.id) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button type="submit" class="btn btn-sm btn-danger btn-table-action" title="Отклонить">
                                                     <i class="fas fa-times"></i>
                                                 </button>

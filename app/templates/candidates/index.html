@@ -1,148 +1,286 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block content %}
-<div class="container-fluid px-4">
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% if current_user.role == 'admin' %}{{ url_for('dashboard.index') }}{% else %}{{ url_for('dashboard.hr_dashboard') }}{% endif %}">Панель управления</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Кандидаты</li>
-                </ol>
-            </nav>
-            <h1 class="section-heading">Управление кандидатами</h1>
-            <p class="text-muted">Просмотр и управление кандидатами на ваши вакансии</p>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<div class="container-fluid">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('dashboard.hr_dashboard') }}">Главная</a></li>
+            <li class="breadcrumb-item active">Канбан кандидатов</li>
+        </ol>
+    </nav>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="vacancy_id" class="form-label">Вакансия</label>
+                    <select class="form-select" id="vacancy_id" name="vacancy_id">
+                        <option value="">Все вакансии</option>
+                        {% for vacancy in vacancies %}
+                        <option value="{{ vacancy.id }}" {% if vacancy_id == vacancy.id %}selected{% endif %}>
+                            {{ vacancy.title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="sort_by" class="form-label">Сортировка</label>
+                    <select class="form-select" id="sort_by" name="sort_by">
+                        <option value="date" {% if sort_by == 'date' %}selected{% endif %}>По дате</option>
+                        <option value="match" {% if sort_by == 'match' %}selected{% endif %}>По совпадению</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">Применить</button>
+                </div>
+            </form>
         </div>
     </div>
-    
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">Фильтры</h4>
+
+    <div class="kanban-board">
+        {% for stage in selection_stages %}
+        <div class="kanban-column" data-stage-id="{{ stage.id }}">
+            <div class="kanban-column-header" style="background: {{ stage.color }};">
+                {{ stage.name }} <span class="kanban-count">{{ kanban_board[stage.id]|length }}</span>
+            </div>
+            <div class="kanban-column-body">
+                {% for candidate in kanban_board[stage.id] %}
+                <a href="{{ url_for('candidates.view', id=candidate.id) }}" class="kanban-card-link">
+                    <div class="kanban-card" draggable="true" data-candidate-id="{{ candidate.id }}">
+                        <div class="kanban-card-header">
+                            <div class="kanban-card-title">{{ candidate.full_name }}</div>
+                            <button class="kanban-view-btn" title="Просмотр" onclick="event.stopPropagation(); window.location.href='{{ url_for('candidates.view', id=candidate.id) }}'; return false;">
+                                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><line x1="10" y1="6" x2="10" y2="10"/><circle cx="10" cy="14" r="1"/></svg>
+                            </button>
+                        </div>
+                        <div class="kanban-card-info">
+                            <div class="kanban-card-vacancy">Вакансия: {{ candidate.vacancy_title }}</div>
+                            <div class="kanban-card-date">Создано: {{ candidate.created_at.strftime('%d.%m.%Y') }}</div>
+                        </div>
+                        <div class="kanban-card-progress">
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" style="width: {{ candidate.ai_match_percent or 0 }}%;"></div>
+                            </div>
+                            <span class="progress-bar-label">{{ candidate.ai_match_percent or 0 }}%</span>
+                        </div>
                     </div>
-                </div>
-                <div class="card-body">
-                    <form method="GET" id="filterForm" class="row gx-3 gy-2 align-items-center">
-                        <div class="col-md-4">
-                            <label for="vacancy_id" class="form-label">Вакансия</label>
-                            <select class="form-select" id="vacancy_id" name="vacancy_id">
-                                <option value="">Все вакансии</option>
-                                {% for vacancy in vacancies %}
-                                <option value="{{ vacancy.id }}" {% if vacancy_id == vacancy.id %}selected{% endif %}>{{ vacancy.title }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="status_id" class="form-label">Статус</label>
-                            <select class="form-select" id="status_id" name="status_id">
-                                <option value="">Все статусы</option>
-                                {% for status in statuses %}
-                                <option value="{{ status.id }}" {% if status_id == status.id %}selected{% endif %}>{{ status.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="sort_by" class="form-label">Сортировка</label>
-                            <select class="form-select" id="sort_by" name="sort_by">
-                                <option value="date" {% if sort_by == 'date' %}selected{% endif %}>По дате (новые)</option>
-                                <option value="match" {% if sort_by == 'match' %}selected{% endif %}>По совпадению</option>
-                            </select>
-                        </div>
-                        <div class="col-12 mt-3">
-                            <button type="submit" class="btn btn-primary">Применить фильтры</button>
-                            <a href="{{ url_for('candidates.index') }}" class="btn btn-outline-secondary">Сбросить</a>
-                        </div>
-                    </form>
-                </div>
+                </a>
+                {% endfor %}
             </div>
         </div>
-    </div>
-    
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0">Список кандидатов</h4>
-                </div>
-                <div class="card-body">
-                    {% if candidates %}
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead>
-                                <tr>
-                                    <th>ФИО</th>
-                                    <th>Вакансия</th>
-                                    <th>Статус</th>
-                                    <th>Дата отклика</th>
-                                    <th>AI-совпадение</th>
-                                    <th>Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for candidate in candidates %}
-                                <tr>
-                                    <td>{{ candidate.full_name }}</td>
-                                    <td>{{ candidate.vacancy.title }}</td>
-                                    <td>
-                                        <span class="badge rounded-pill" 
-                                            style="background-color: {{ candidate.c_candidate_status.color_code if candidate.c_candidate_status else '#6c757d' }}">
-                                            {{ candidate.c_candidate_status.name if candidate.c_candidate_status else 'Заявка подана' }}
-                                        </span>
-                                    </td>
-                                    <td>{{ candidate.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
-                                    <td>
-                                        {% if candidate.ai_match_percent %}
-                                        <div class="progress" style="height: 20px;">
-                                            <div class="progress-bar 
-                                                {% if candidate.ai_match_percent >= 80 %}bg-success
-                                                {% elif candidate.ai_match_percent >= 60 %}bg-primary
-                                                {% elif candidate.ai_match_percent >= 40 %}bg-info
-                                                {% elif candidate.ai_match_percent >= 20 %}bg-warning
-                                                {% else %}bg-danger{% endif %}" 
-                                                role="progressbar" 
-                                                style="width: {{ candidate.ai_match_percent }}%;" 
-                                                aria-valuenow="{{ candidate.ai_match_percent }}" 
-                                                aria-valuemin="0" 
-                                                aria-valuemax="100">{{ candidate.ai_match_percent }}%</div>
-                                        </div>
-                                        {% else %}
-                                        <span class="text-muted">Нет данных</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <a href="{{ url_for('candidates.view', id=candidate.id) }}" class="btn btn-sm btn-primary">
-                                            <i class="fas fa-eye"></i> Просмотр
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>Нет кандидатов, соответствующих выбранным критериям
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+        {% endfor %}
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<style>
+.kanban-board {
+    display: flex;
+    gap: 24px;
+    align-items: stretch;
+    min-height: 600px;
+}
+.kanban-column {
+    background: #f8f9fa;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    padding: 0 0 16px 0;
+    min-width: 320px;
+    max-width: 340px;
+    flex: 1 1 320px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.kanban-column-header {
+    border-radius: 14px 14px 0 0;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1.1em;
+    padding: 16px 20px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.kanban-count {
+    background: rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 0.95em;
+}
+.kanban-column-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1 1 auto;
+    min-height: 400px;
+}
+.kanban-card-link {
+    text-decoration: none;
+    color: inherit;
+}
+.kanban-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    padding: 18px 20px 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: box-shadow 0.15s, transform 0.15s;
+    cursor: pointer;
+    position: relative;
+}
+.kanban-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+    transform: translateY(-2px) scale(1.01);
+}
+.kanban-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+.kanban-card-title {
+    font-size: 1.08em;
+    font-weight: 600;
+    color: #2d3a4a;
+    line-height: 1.2;
+    flex: 1 1 auto;
+    word-break: break-word;
+}
+.kanban-view-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 8px;
+    cursor: pointer;
+    color: #6c757d;
+    transition: color 0.15s;
+}
+.kanban-view-btn:hover {
+    color: #007bff;
+}
+.kanban-card-info {
+    font-size: 0.98em;
+    color: #495057;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.kanban-card-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+.progress-bar-bg {
+    background: #e9ecef;
+    border-radius: 6px;
+    width: 100px;
+    height: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.progress-bar-fill {
+    background: #4caf50;
+    height: 100%;
+    border-radius: 6px 0 0 6px;
+    transition: width 0.3s;
+}
+.progress-bar-label {
+    font-size: 0.97em;
+    color: #4caf50;
+    font-weight: 500;
+    min-width: 36px;
+}
+</style>
+
 <script>
-    // Автоматическое обновление формы при изменении селектов
-    document.addEventListener('DOMContentLoaded', function() {
-        const selects = document.querySelectorAll('#filterForm select');
-        selects.forEach(select => {
-            select.addEventListener('change', function() {
-                document.getElementById('filterForm').submit();
-            });
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.kanban-card');
+    const columns = document.querySelectorAll('.kanban-column');
+    
+    cards.forEach(card => {
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
     });
+    
+    columns.forEach(column => {
+        column.addEventListener('dragover', handleDragOver);
+        column.addEventListener('drop', handleDrop);
+    });
+    
+    function handleDragStart(e) {
+        e.target.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', e.target.dataset.candidateId);
+    }
+    
+    function handleDragEnd(e) {
+        e.target.classList.remove('dragging');
+    }
+    
+    function handleDragOver(e) {
+        e.preventDefault();
+        const column = e.target.closest('.kanban-column');
+        if (column) {
+            column.classList.add('drag-over');
+        }
+    }
+    
+    function handleDrop(e) {
+        e.preventDefault();
+        const column = e.target.closest('.kanban-column');
+        if (!column) return;
+        
+        column.classList.remove('drag-over');
+        const candidateId = e.dataTransfer.getData('text/plain');
+        const stageId = column.dataset.stageId;
+        
+        // Получаем CSRF токен
+        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+        if (!csrfToken) {
+            console.error('CSRF токен не найден');
+            alert('Ошибка безопасности: CSRF токен не найден');
+            return;
+        }
+        
+        // Отправляем AJAX-запрос для обновления этапа отбора
+        fetch('/candidates/api/candidates/update-stage', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken.getAttribute('content')
+            },
+            body: JSON.stringify({
+                candidate_id: candidateId,
+                stage_id: stageId
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new TypeError("Ответ сервера не в формате JSON!");
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                // Перезагружаем страницу для обновления данных
+                window.location.reload();
+            } else {
+                alert(data.message || 'Ошибка при обновлении этапа отбора');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Произошла ошибка при обновлении этапа отбора: ' + error.message);
+        });
+    }
+});
 </script>
 {% endblock %} 

@@ -24,17 +24,17 @@
                     
                     <h3 class="section-heading">Описание задач</h3>
                     <div class="vacancy-section mb-4">
-                        {{ vacancy.description_tasks | safe }}
+                        {{ vacancy.description_tasks | nl2br | safe }}
                     </div>
                     
                     <h3 class="section-heading">Условия работы</h3>
                     <div class="vacancy-section mb-4">
-                        {{ vacancy.description_conditions | safe }}
+                        {{ vacancy.description_conditions | nl2br | safe }}
                     </div>
                     
                     <h3 class="section-heading">Идеальный кандидат</h3>
                     <div class="vacancy-section mb-4">
-                        {{ vacancy.ideal_profile | safe }}
+                        {{ vacancy.ideal_profile | nl2br | safe }}
                     </div>
                     
                     <div class="apply-button mt-4">
@@ -57,11 +57,20 @@
                             <i class="fas fa-info-circle me-2 text-primary"></i>
                             <strong>Этапы отбора:</strong>
                             <ul class="mt-2">
+                                <li>Новая заявка</li>
+                                {% if vacancy.selection_stages_json %}
+                                    {% for stage in vacancy.selection_stages_json %}
+                                        <li>{{ stage.name }}</li>
+                                    {% endfor %}
+                                {% else %}
                                 <li>Рассмотрение резюме</li>
                                 <li>Тестовое задание</li>
                                 <li>Собеседование с HR</li>
                                 <li>Техническое интервью</li>
-                                <li>Предложение о работе</li>
+                                    <li>Предложение</li>
+                                {% endif %}
+                                <li>Отказ</li>
+                                <li>Принят на работу</li>
                             </ul>
                         </li>
                         <li class="list-group-item">

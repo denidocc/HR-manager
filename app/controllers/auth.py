@@ -155,6 +155,7 @@ def register_hr():
             # Создаем нового пользователя
             user = User()
             user.email = form.email.data
+            user.phone = form.phone.data
             user.set_password(form.password.data)
             user.role = 'hr'  # По умолчанию роль HR
             user.full_name = f"{form.first_name.data} {form.last_name.data}"

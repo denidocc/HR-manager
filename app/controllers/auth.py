@@ -5,8 +5,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
 from app import db, argon2
-from app.models.user import User
-from app.models.system_log import SystemLog
+from app.models import User, SystemLog, C_Selection_Stage, User_Selection_Stage
 from app.forms.auth import LoginForm, RegisterForm, ResetPasswordRequestForm, ResetPasswordForm, PublicRegisterForm
 from app.utils.email_service import send_password_reset_email
 from functools import wraps
@@ -153,18 +152,35 @@ def register_hr():
             flash('Email уже зарегистрирован в системе', 'danger')
         else:
             # Создаем нового пользователя
-            user = User()
-            user.email = form.email.data
-            user.phone = form.phone.data
+            user = User(
+                email=form.email.data,
+                phone=form.phone.data,
+                role='hr',  # По умолчанию роль HR
+                full_name=f"{form.first_name.data} {form.last_name.data}",
+                company=form.company.data,
+                position=form.position.data,
+                id_c_user_status=2  # Статус "Ожидает подтверждения"
+            )
             user.set_password(form.password.data)
-            user.role = 'hr'  # По умолчанию роль HR
-            user.full_name = f"{form.first_name.data} {form.last_name.data}"
-            user.company = form.company.data
-            user.position = form.position.data
-            user.id_c_user_status = 2  # Статус "Ожидает подтверждения"
-            
-            # Сохраняем в базу
+
+            # Добавляем пользователя в сессию и флашим, чтобы получить user.id
             db.session.add(user)
+            db.session.flush()
+
+            # Получаем все активные этапы подбора
+            active_stages = db.session.query(C_Selection_Stage).filter_by(is_active=True).all()
+
+            # Связываем пользователя с каждым этапом
+            for stage in active_stages:
+                user_stage = User_Selection_Stage(
+                    user_id=user.id,
+                    stage_id=stage.id,
+                    order=stage.order,
+                    is_active=True
+                )
+                db.session.add(user_stage)
+
+            # Финальное сохранение в базу
             db.session.commit()
             
             # Логирование регистрации

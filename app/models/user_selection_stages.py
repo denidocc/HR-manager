@@ -19,6 +19,14 @@ class User_Selection_Stage(db.Model):
     selection_stage = so.relationship('C_Selection_Stage', back_populates='user_selection_stages')
     candidates = so.relationship('Candidate', back_populates='user_selection_stage', overlaps="user")
     
+    def to_dict(self):
+        return {
+            'user_id': self.user_id,
+            'stage_id': self.stage_id,
+            'order': self.order,
+            'is_active': self.is_active
+        }
+    
     def __repr__(self):
         return f'<User_Selection_Stage {self.user_id}:{self.stage_id}>'
     

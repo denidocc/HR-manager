@@ -12,7 +12,7 @@
                 </ol>
             </nav>
             <div class="d-flex justify-content-between align-items-center">
-                <h1 class="section-heading">Создание новой вакансии</h1>
+            <h1 class="section-heading">Создание новой вакансии</h1>
                 <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#aiGeneratorModal">
                     <i class="fas fa-magic me-1"></i> Нужна помощь при заполнении?
                 </button>
@@ -158,11 +158,18 @@
                 <p class="text-muted">Введите базовую информацию о вакансии, и мы поможем вам создать полное описание с профессиональными вопросами.</p>
                 
                 <form id="aiGeneratorForm">
+                    {{ form.hidden_tag() }}
+                    <input type="hidden" name="is_ai_generated" id="is_ai_generated" value="True">
+                    <input type="hidden" name="ai_generation_date" id="ai_generation_date" value="">
+                    <input type="hidden" name="ai_generation_prompt" id="ai_generation_prompt" value="">
+                    <input type="hidden" name="ai_generation_metadata" id="ai_generation_metadata" value="">
+
                     <div class="mb-3">
                         <label for="ai_title" class="form-label">Название вакансии</label>
                         <input type="text" class="form-control" id="ai_title" name="title" required>
                         <div class="invalid-feedback" id="ai_title_error"></div>
                     </div>
+
                     
                     <div class="mb-3">
                         <label for="ai_employment_type" class="form-label">Тип занятости</label>
@@ -203,6 +210,7 @@
                     <div class="alert alert-success">
                         <h5>Вакансия успешно сгенерирована!</h5>
                         <p>Данные будут автоматически заполнены в форме создания вакансии.</p>
+                        <p>Окно само закроется через 2 секунды.</p>
                     </div>
                 </div>
                 
@@ -223,11 +231,213 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/vacancy_questions.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Обработчик для кнопки генерации вакансии
-        const generateBtn = document.getElementById('generateVacancyBtn');
+        // Функция для обновления отображения вопросов
+        function updateQuestionsDisplay() {
+            // Обновляем JSON поля
+            document.getElementById('questionsJsonField').value = JSON.stringify(questions);
+            document.getElementById('softQuestionsJsonField').value = JSON.stringify(softQuestions);
+            
+            // Обновляем отображение вопросов в контейнерах
+            const questionsContainer = document.getElementById('questionsContainer');
+            const softQuestionsContainer = document.getElementById('softQuestionsContainer');
+            
+            // Очищаем контейнеры
+            questionsContainer.innerHTML = '';
+            softQuestionsContainer.innerHTML = '';
+            
+            // Добавляем профессиональные вопросы
+            questions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-item mb-3';
+                questionDiv.innerHTML = `
+                    <div class="input-group">
+                        <input type="text" class="form-control" value="${q.text || ''}" placeholder="Введите текст вопроса" onchange="updateQuestionText(${index}, this.value)">
+                        <button type="button" class="btn btn-outline-danger" onclick="removeQuestion(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="mt-2">
+                        <select class="form-select form-select-sm" onchange="updateQuestionType(${index}, this.value)">
+                            <option value="text" ${q.type === 'text' ? 'selected' : ''}>Текстовый ответ</option>
+                            <option value="select" ${q.type === 'select' ? 'selected' : ''}>Один вариант из списка</option>
+                            <option value="multiselect" ${q.type === 'multiselect' ? 'selected' : ''}>Несколько вариантов из списка</option>
+                        </select>
+                    </div>
+                    ${(q.type === 'select' || q.type === 'multiselect') ? `
+                        <div class="mt-2">
+                            <textarea class="form-control form-control-sm" rows="3" placeholder="Варианты ответов (каждый с новой строки)" onchange="updateQuestionOptions(${index}, this.value)">${(q.options || []).join('\n')}</textarea>
+                        </div>
+                    ` : ''}
+                `;
+                questionsContainer.appendChild(questionDiv);
+            });
+            
+            // Добавляем soft-вопросы
+            softQuestions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-item mb-3';
+                questionDiv.innerHTML = `
+                    <div class="input-group">
+                        <input type="text" class="form-control" value="${q.text || ''}" placeholder="Введите текст вопроса" onchange="updateSoftQuestionText(${index}, this.value)">
+                        <button type="button" class="btn btn-outline-danger" onclick="removeSoftQuestion(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                softQuestionsContainer.appendChild(questionDiv);
+            });
+        }
+
+        // Функции для добавления вопросов
+        window.addQuestion = function(text = '', type = 'text') {
+            console.log('Добавление вопроса:', text, type);
+            questions.push({
+                id: questions.length + 1,
+                text: text,
+                type: type,
+                options: [],
+                required: true  // Добавляем обязательное поле
+            });
+            updateQuestionsDisplay();
+        };
+
+        window.addSoftQuestion = function(text = '', type = 'text') {
+            console.log('Добавление soft-вопроса:', text, type);
+            softQuestions.push({
+                id: softQuestions.length + 1,
+                text: text,
+                type: type,
+                required: true  // Добавляем обязательное поле
+            });
+            updateQuestionsDisplay();
+        };
+
+        // Функции для обновления вопросов
+        window.updateQuestionText = function(index, value) {
+            console.log('Обновление текста вопроса:', index, value);
+            if (questions[index]) {
+                questions[index].text = value;
+                updateQuestionsDisplay();
+            }
+        };
+
+        window.updateQuestionType = function(index, value) {
+            console.log('Обновление типа вопроса:', index, value);
+            if (questions[index]) {
+                questions[index].type = value;
+                updateQuestionsDisplay();
+            }
+        };
+
+        window.updateQuestionOptions = function(index, value) {
+            console.log('Обновление опций вопроса:', index, value);
+            if (questions[index]) {
+                questions[index].options = value.split('\n').filter(o => o.trim() !== '');
+                updateQuestionsDisplay();
+            }
+        };
+
+        window.updateSoftQuestionText = function(index, value) {
+            console.log('Обновление текста soft-вопроса:', index, value);
+            if (softQuestions[index]) {
+                softQuestions[index].text = value;
+                updateQuestionsDisplay();
+            }
+        };
+
+        // Функции для удаления вопросов
+        window.removeQuestion = function(index) {
+            console.log('Удаление вопроса:', index);
+            questions.splice(index, 1);
+            // Обновляем id оставшихся вопросов
+            questions.forEach((q, i) => q.id = i + 1);
+            updateQuestionsDisplay();
+        };
+
+        window.removeSoftQuestion = function(index) {
+            console.log('Удаление soft-вопроса:', index);
+            softQuestions.splice(index, 1);
+            // Обновляем id оставшихся вопросов
+            softQuestions.forEach((q, i) => q.id = i + 1);
+            updateQuestionsDisplay();
+        };
+
+        // Инициализация массивов вопросов
+        let questions = [];
+        let softQuestions = [];
+
+        // Добавляем обработчики для кнопок
+        const addQuestionBtn = document.getElementById('addQuestionBtn');
+        const addSoftQuestionBtn = document.getElementById('addSoftQuestionBtn');
+
+        if (addQuestionBtn) {
+            addQuestionBtn.addEventListener('click', function() {
+                console.log('Клик по кнопке добавления вопроса');
+                addQuestion('', 'text');
+            });
+        }
+
+        if (addSoftQuestionBtn) {
+            addSoftQuestionBtn.addEventListener('click', function() {
+                console.log('Клик по кнопке добавления soft-вопроса');
+                addSoftQuestion('', 'text');
+            });
+        }
+
+        // Обработчик отправки формы
+        document.getElementById('vacancyForm').addEventListener('submit', function(e) {
+            console.log('Отправка формы');
+            
+            // Проверяем, что вопросы не пустые
+            if (questions.length === 0) {
+                console.warn('Нет профессиональных вопросов');
+            }
+            if (softQuestions.length === 0) {
+                console.warn('Нет soft-вопросов');
+            }
+            
+            // Обновляем скрытые поля с JSON данными
+            const questionsJsonField = document.getElementById('questionsJsonField');
+            const softQuestionsJsonField = document.getElementById('softQuestionsJsonField');
+            
+            // Проверяем, что поля существуют
+            if (!questionsJsonField || !softQuestionsJsonField) {
+                console.error('Не найдены поля для JSON данных');
+                e.preventDefault();
+                return;
+            }
+            
+            // Сериализуем данные в JSON
+            try {
+                questionsJsonField.value = JSON.stringify(questions);
+                softQuestionsJsonField.value = JSON.stringify(softQuestions);
+                
+                console.log('Отправляемые вопросы:', questions);
+                console.log('Отправляемые soft-вопросы:', softQuestions);
+                console.log('JSON поля:', {
+                    questions: questionsJsonField.value,
+                    softQuestions: softQuestionsJsonField.value
+                });
+            } catch (error) {
+                console.error('Ошибка при сериализации JSON:', error);
+                e.preventDefault();
+                return;
+            }
+        });
+
+        // Инициализация начальных вопросов
+        if (questions.length === 0) {
+            addQuestion('', 'text');
+        }
+        if (softQuestions.length === 0) {
+            addSoftQuestion('', 'text');
+        }
+    });
+
+    // Обработчик для кнопки генерации вакансии
+    const generateBtn = document.getElementById('generateVacancyBtn');
         const aiForm = document.getElementById('aiGeneratorForm');
         const progressDiv = document.getElementById('generationProgress');
         const resultDiv = document.getElementById('generationResult');
@@ -307,127 +517,137 @@
                     'X-CSRFToken': '{{ csrf_token() }}'
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 // Скрываем индикатор загрузки
                 progressDiv.classList.add('d-none');
                 
-                if (data.status === 'success') {
-                    // Показываем сообщение об успехе
-                    resultDiv.classList.remove('d-none');
-                    
-                    // Скрываем сообщение об ошибке, если оно было показано
-                    errorDiv.classList.add('d-none');
-                    
-                    // Заполняем форму создания вакансии данными от ИИ
-                    document.getElementById('title').value = data.data.title;
-                    
-                    // Находим правильный тип занятости в селекте по ID
-                    const employmentTypeSelect = document.getElementById('id_c_employment_type');
-                    const selectedEmploymentTypeId = document.getElementById('ai_employment_type').value;
-                    
-                    console.log('Выбранный тип занятости:', selectedEmploymentTypeId);
-                    
-                    // Устанавливаем значение типа занятости
-                    if (selectedEmploymentTypeId) {
-                        // Устанавливаем значение по ID
-                        for (let i = 0; i < employmentTypeSelect.options.length; i++) {
-                            if (employmentTypeSelect.options[i].value === selectedEmploymentTypeId) {
-                                employmentTypeSelect.selectedIndex = i;
-                                break;
-                            }
+                // Проверяем наличие данных в ответе
+                if (!data || !data.data) {
+                    throw new Error('Некорректный формат ответа от сервера');
+                }
+                
+                // Показываем сообщение об успехе
+                resultDiv.classList.remove('d-none');
+                errorDiv.classList.add('d-none');
+                
+                // Заполняем форму создания вакансии данными от ИИ
+                document.getElementById('title').value = data.data.title || '';
+                
+                // Находим правильный тип занятости в селекте по ID
+                const employmentTypeSelect = document.getElementById('id_c_employment_type');
+                const selectedEmploymentTypeId = document.getElementById('ai_employment_type').value;
+                
+                // Устанавливаем значение типа занятости
+                if (selectedEmploymentTypeId) {
+                    for (let i = 0; i < employmentTypeSelect.options.length; i++) {
+                        if (employmentTypeSelect.options[i].value === selectedEmploymentTypeId) {
+                            employmentTypeSelect.selectedIndex = i;
+                            break;
                         }
-                    } else {
-                        // Если тип занятости не выбран, выбираем первый элемент (пустой)
-                        employmentTypeSelect.selectedIndex = 0;
-                    }
-                    
-                    // Заполняем текстовые поля
-                    document.getElementById('description_tasks').value = data.data.description_tasks;
-                    document.getElementById('description_conditions').value = data.data.description_conditions;
-                    document.getElementById('ideal_profile').value = data.data.ideal_profile;
-                    
-                    // Очищаем контейнеры вопросов перед добавлением новых
-                    document.getElementById('questionsContainer').innerHTML = '';
-                    document.getElementById('softQuestionsContainer').innerHTML = '';
-                    
-                    // Сбрасываем глобальные массивы вопросов
-                    questions = [];
-                    softQuestions = [];
-                    
-                    // Заполняем профессиональные вопросы
-                    if (data.data.questions && data.data.questions.length > 0) {
-                        // Добавляем новые вопросы (максимум 7)
-                        const maxQuestions = Math.min(data.data.questions.length, 7);
-                        for (let i = 0; i < maxQuestions; i++) {
-                            addQuestion(data.data.questions[i].text, 'text');
-                        }
-                    }
-                    
-                    // Заполняем вопросы на soft skills
-                    if (data.data.soft_questions && data.data.soft_questions.length > 0) {
-                        // Добавляем новые вопросы (максимум 7)
-                        const maxSoftQuestions = Math.min(data.data.soft_questions.length, 7);
-                        for (let i = 0; i < maxSoftQuestions; i++) {
-                            addSoftQuestion(data.data.soft_questions[i].text, 'text');
-                        }
-                    }
-                    
-                    // Закрываем модальное окно через 2 секунды
-                    setTimeout(() => {
-                        const bsModal = bootstrap.Modal.getInstance(modal);
-                        bsModal.hide();
-                    }, 2000);
-                } else {
-                    // Показываем сообщение об ошибке
-                    errorDiv.classList.remove('d-none');
-                    
-                    // Скрываем сообщение об успехе, если оно было показано
-                    resultDiv.classList.add('d-none');
-                    
-                    // Если есть детали ошибок, отображаем их
-                    if (data.errors) {
-                        let errorDetails = '';
-                        for (const field in data.errors) {
-                            errorDetails += `${field}: ${data.errors[field].join(', ')}<br>`;
-                            
-                            // Подсвечиваем поля с ошибками
-                            const fieldElement = document.getElementById(`ai_${field}`);
-                            if (fieldElement) {
-                                fieldElement.classList.add('is-invalid');
-                                const errorElement = document.getElementById(`ai_${field}_error`);
-                                if (errorElement) {
-                                    errorElement.innerHTML = data.errors[field].join(', ');
-                                }
-                            }
-                        }
-                        errorMessage.innerHTML = errorDetails || data.message || 'Произошла ошибка при генерации вакансии';
-                    } else {
-                        errorMessage.textContent = data.message || 'Произошла ошибка при генерации вакансии';
                     }
                 }
                 
-                // Разблокируем кнопку
-                generateBtn.disabled = false;
+                // Заполняем текстовые поля
+                document.getElementById('description_tasks').value = data.data.description_tasks || '';
+                document.getElementById('description_conditions').value = data.data.description_conditions || '';
+                document.getElementById('ideal_profile').value = data.data.ideal_profile || '';
+                
+                // Очищаем контейнеры вопросов
+                document.getElementById('questionsContainer').innerHTML = '';
+                document.getElementById('softQuestionsContainer').innerHTML = '';
+                
+                // Сбрасываем глобальные массивы вопросов
+                questions = [];
+                softQuestions = [];
+                
+                // Заполняем профессиональные вопросы
+                if (data.data.questions && Array.isArray(data.data.questions)) {
+                    questions = []; // Очищаем массив перед добавлением новых вопросов
+                    data.data.questions.forEach((question, index) => {
+                        if (question && question.text) {
+                            questions.push({
+                                id: index + 1,
+                                text: question.text,
+                                type: 'text',
+                                options: []
+                            });
+                        }
+                    });
+                }
+                
+                // Заполняем вопросы на soft skills
+                if (data.data.soft_questions && Array.isArray(data.data.soft_questions)) {
+                    softQuestions = []; // Очищаем массив перед добавлением новых вопросов
+                    data.data.soft_questions.forEach((question, index) => {
+                        if (question && question.text) {
+                            softQuestions.push({
+                                id: index + 1,
+                                text: question.text,
+                                type: 'text'
+                            });
+                        }
+                    });
+                }
+                
+                // Заполняем метаданные генерации
+                if (data.data.is_ai_generated) {
+                    document.getElementById('is_ai_generated').value = 'True';
+                }
+                if (data.data.ai_generation_date) {
+                    document.getElementById('ai_generation_date').value = data.data.ai_generation_date;
+                }
+                if (data.data.ai_generation_prompt) {
+                    document.getElementById('ai_generation_prompt').value = data.data.ai_generation_prompt;
+                    // Добавляем скрытое поле в основную форму
+                    const promptField = document.createElement('input');
+                    promptField.type = 'hidden';
+                    promptField.name = 'ai_generation_prompt';
+                    promptField.value = data.data.ai_generation_prompt;
+                    document.getElementById('vacancyForm').appendChild(promptField);
+                }
+                if (data.data.ai_generation_metadata) {
+                    document.getElementById('ai_generation_metadata').value = JSON.stringify(data.data.ai_generation_metadata);
+                    // Добавляем скрытое поле в основную форму
+                    const metadataField = document.createElement('input');
+                    metadataField.type = 'hidden';
+                    metadataField.name = 'ai_generation_metadata';
+                    metadataField.value = JSON.stringify(data.data.ai_generation_metadata);
+                    document.getElementById('vacancyForm').appendChild(metadataField);
+                }
+                
+                // Обновляем отображение вопросов
+                updateQuestionsDisplay();
+                
+                // Закрываем модальное окно через 2 секунды
+                setTimeout(() => {
+                    const bsModal = bootstrap.Modal.getInstance(modal);
+                    if (bsModal) {
+                        bsModal.hide();
+                    }
+                }, 2000);
             })
             .catch(error => {
+                console.error('Error:', error);
+                
                 // Скрываем индикатор загрузки
                 progressDiv.classList.add('d-none');
                 
                 // Показываем сообщение об ошибке
                 errorDiv.classList.remove('d-none');
-                
-                // Скрываем сообщение об успехе, если оно было показано
                 resultDiv.classList.add('d-none');
                 
-                errorMessage.textContent = 'Произошла ошибка при отправке запроса';
+                // Отображаем текст ошибки
+                errorMessage.textContent = error.message || 'Произошла ошибка при генерации вакансии';
                 
                 // Разблокируем кнопку
                 generateBtn.disabled = false;
-                
-                console.error('Error:', error);
             });
         });
-    });
 </script>
-{% endblock %}
+{% endblock %} 

@@ -1831,6 +1831,20 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
             if len(vacancy_data['soft_questions']) > 7:
                 vacancy_data['soft_questions'] = vacancy_data['soft_questions'][:7]
                 
+            # Добавляем метаданные о генерации
+            from datetime import datetime
+            vacancy_data.update({
+                'is_ai_generated': True,
+                'ai_generation_date': datetime.now().isoformat(),
+                'ai_generation_promt': prompt,
+                'ai_generation_metadata': {
+                    'model': 'gpt-4o',
+                    'temperature': 0.7,
+                    'max_tokens': 4000,
+                    'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
+                
         except json.JSONDecodeError:
             current_app.logger.error(f"Не удалось распарсить JSON из ответа API: {result[:500]}")
             return None

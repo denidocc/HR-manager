@@ -44,7 +44,7 @@
             <div class="kanban-column-header" style="background: {{ stage.color }};">
                 {{ stage.name }} <span class="kanban-count">{{ kanban_board[stage.id]|length }}</span>
             </div>
-            <div class="kanban-column-body">
+            <div class="kanban-column-body p-3">
                 {% for candidate in kanban_board[stage.id] %}
                 <a href="{{ url_for('candidates.view', id=candidate.id) }}" class="kanban-card-link">
                     <div class="kanban-card" draggable="true" data-candidate-id="{{ candidate.id }}">

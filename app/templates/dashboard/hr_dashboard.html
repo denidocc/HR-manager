@@ -42,7 +42,7 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h4 class="mb-0">Аналитика и метрики</h4>
+                    <h4 class="mb-0">Аналитика и метрики (в разработке)</h4>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -52,7 +52,7 @@
                                     <i class="fas fa-funnel-dollar fa-2x mb-3 text-primary"></i>
                                     <h5 class="card-title">Воронка найма</h5>
                                     <p class="card-text">Анализ движения кандидатов по этапам найма</p>
-                                    <a href="{{ url_for('dashboard.recruitment_funnel') }}" class="btn btn-sm btn-outline-primary mt-2">Подробнее</a>
+                                    <a href="#" class="btn btn-sm btn-outline-primary mt-2">Подробнее</a>
                                 </div>
                             </div>
                         </div>
@@ -62,7 +62,7 @@
                                     <i class="fas fa-clock fa-2x mb-3 text-success"></i>
                                     <h5 class="card-title">Время закрытия</h5>
                                     <p class="card-text">Анализ сроков найма по вакансиям</p>
-                                    <a href="{{ url_for('dashboard.time_to_fill') }}" class="btn btn-sm btn-outline-success mt-2">Подробнее</a>
+                                    <a href="#" class="btn btn-sm btn-outline-success mt-2">Подробнее</a>
                                 </div>
                             </div>
                         </div>
@@ -72,7 +72,7 @@
                                     <i class="fas fa-user-check fa-2x mb-3 text-info"></i>
                                     <h5 class="card-title">Квалификация</h5>
                                     <p class="card-text">Анализ уровня квалификации кандидатов</p>
-                                    <a href="{{ url_for('dashboard.qualification_analysis') }}" class="btn btn-sm btn-outline-info mt-2">Подробнее</a>
+                                    <a href="#" class="btn btn-sm btn-outline-info mt-2">Подробнее</a>
                                 </div>
                             </div>
                         </div>
@@ -82,7 +82,7 @@
                                     <i class="fas fa-code-branch fa-2x mb-3 text-warning"></i>
                                     <h5 class="card-title">Навыки</h5>
                                     <p class="card-text">Анализ навыков кандидатов</p>
-                                    <a href="{{ url_for('dashboard.skills_analysis') }}" class="btn btn-sm btn-outline-warning mt-2">Подробнее</a>
+                                    <a href="#" class="btn btn-sm btn-outline-warning mt-2">Подробнее</a>
                                 </div>
                             </div>
                         </div>
@@ -94,7 +94,7 @@
                                     <i class="fas fa-bullhorn fa-2x mb-3 text-danger"></i>
                                     <h5 class="card-title">Источники</h5>
                                     <p class="card-text">Анализ эффективности источников кандидатов</p>
-                                    <a href="{{ url_for('dashboard.source_analysis') }}" class="btn btn-sm btn-outline-danger mt-2">Подробнее</a>
+                                    <a href="#" class="btn btn-sm btn-outline-danger mt-2">Подробнее</a>
                                 </div>
                             </div>
                         </div>
@@ -104,7 +104,7 @@
                                     <i class="fas fa-thumbs-down fa-2x mb-3 text-secondary"></i>
                                     <h5 class="card-title">Анализ отказов</h5>
                                     <p class="card-text">Причины отказов кандидатам и от кандидатов</p>
-                                    <a href="{{ url_for('dashboard.rejection_analysis') }}" class="btn btn-sm btn-outline-secondary mt-2">Подробнее</a>
+                                    <a href="#" class="btn btn-sm btn-outline-secondary mt-2">Подробнее</a>
                                 </div>
                             </div>
                         </div>
@@ -114,7 +114,7 @@
                                     <i class="fas fa-chart-line fa-2x mb-3 text-primary"></i>
                                     <h5 class="card-title">Прогнозы</h5>
                                     <p class="card-text">Прогнозная аналитика по найму</p>
-                                    <a href="{{ url_for('dashboard.predictive_analytics') }}" class="btn btn-sm btn-outline-primary mt-2">Подробнее</a>
+                                    <a href="#" class="btn btn-sm btn-outline-primary mt-2">Подробнее</a>
                                 </div>
                             </div>
                         </div>
@@ -124,7 +124,7 @@
                                     <i class="fas fa-calendar-alt fa-2x mb-3 text-success"></i>
                                     <h5 class="card-title">Сезонные тренды</h5>
                                     <p class="card-text">Анализ сезонных закономерностей</p>
-                                    <a href="{{ url_for('dashboard.seasonal_trends') }}" class="btn btn-sm btn-outline-success mt-2">Подробнее</a>
+                                    <a href="#" class="btn btn-sm btn-outline-success mt-2">Подробнее</a>
                                 </div>
                             </div>
                         </div>
@@ -161,8 +161,8 @@
                                     <td>{{ candidate.full_name }}</td>
                                     <td>{{ candidate.vacancy.title if candidate.vacancy else 'Не указана' }}</td>
                                     <td>
-                                        <span class="badge text-white" data-color="{{ candidate.stage_id.color }}">
-                                            {{ candidate.stage_id.name }}
+                                        <span class="badge text-white" data-color="{{ candidate.user_selection_stage.selection_stage.color if candidate.user_selection_stage else 'secondary' }}">
+                                            {{ candidate.user_selection_stage.selection_stage.name if candidate.user_selection_stage else 'Заявка подана' }}
                                         </span>
                                     </td>
                                     <td>{{ candidate.created_at.strftime('%d.%m.%Y') }}</td>

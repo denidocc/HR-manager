@@ -215,7 +215,7 @@
                         <div class="mb-4 form-section">
                             <h4 class="section-heading">Загрузите ваше резюме</h4>
                             <div class="mb-3">
-                                {{ form.resume.label(class="form-label") }} <span class="text-danger">*</span>
+                                {{ form.resume.label(class="form-label") }}
                                 {{ form.resume(class="form-control" + (" is-invalid" if form.resume.errors else "")) }}
                                 {% if form.resume.errors %}
                                     <div class="invalid-feedback">

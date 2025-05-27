@@ -20,23 +20,28 @@ class VacancyForm(FlaskForm):
     
     description_tasks = TextAreaField('Описание задач', validators=[
         DataRequired(message='Введите описание задач'),
-        Length(min=50, message='Описание задач должно содержать минимум 50 символов')
+        Length(min=10, message='Описание задач должно содержать минимум 10 символов')
     ])
     
     description_conditions = TextAreaField('Условия работы', validators=[
         DataRequired(message='Введите условия работы'),
-        Length(min=50, message='Условия работы должны содержать минимум 50 символов')
+        Length(min=10, message='Условия работы должны содержать минимум 10 символов')
     ])
     
     ideal_profile = TextAreaField('Идеальный кандидат', validators=[
         DataRequired(message='Введите описание идеального кандидата'),
-        Length(min=50, message='Описание идеального кандидата должно содержать минимум 50 символов')
+        Length(min=10, message='Описание идеального кандидата должно содержать минимум 10 символов')
     ])
     
     questions_json = HiddenField('Профессиональные вопросы')
     soft_questions_json = HiddenField('Вопросы на soft skills')
     
     is_active = BooleanField('Активна')
+    
+    is_ai_generated = HiddenField('Генерация с помощью ИИ')
+    ai_generation_date = HiddenField('Дата генерации')
+    ai_generation_prompt = HiddenField('Промпт генерации')
+    ai_generation_metadata = HiddenField('Метаданные генерации')
     
     submit = SubmitField('Сохранить')
     
@@ -60,6 +65,14 @@ class VacancyForm(FlaskForm):
             raise ValidationError('Выберите тип занятости')
         # Значение 0 теперь допустимо, так как это "Неизвестно"
 
+    def process_formdata(self, valuelist):
+        """Преобразование строковых булевых значений в настоящие булевы значения"""
+        super().process_formdata(valuelist)
+        if hasattr(self, 'is_ai_generated') and self.is_ai_generated.data:
+            self.is_ai_generated.data = self.is_ai_generated.data.lower() == 'true'
+        if hasattr(self, 'is_active') and self.is_active.data:
+            self.is_active.data = self.is_active.data.lower() == 'true'
+
 class VacancyAIGeneratorForm(FlaskForm):
     """Мини-форма для генерации вакансии с помощью ИИ"""
     title = StringField('Название вакансии', validators=[
@@ -81,6 +94,11 @@ class VacancyAIGeneratorForm(FlaskForm):
         DataRequired(message='Введите краткие условия работы'),
         Length(min=20, message='Условия работы должны содержать минимум 20 символов')
     ])
+    
+    is_ai_generated = HiddenField('Генерация с помощью ИИ')
+    ai_generation_date = HiddenField('Дата генерации')
+    ai_generation_prompt = HiddenField('Промпт генерации')
+    ai_generation_metadata = HiddenField('Метаданные генерации')
     
     submit = SubmitField('Сгенерировать вакансию')
     

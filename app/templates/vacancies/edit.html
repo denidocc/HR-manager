@@ -143,5 +143,250 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/vacancy_questions.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Функция для обновления отображения вопросов
+        function updateQuestionsDisplay() {
+            console.log('Обновление отображения вопросов');
+            console.log('Текущие вопросы:', JSON.stringify(questions));
+            console.log('Текущие soft-вопросы:', JSON.stringify(softQuestions));
+            
+            // Обновляем JSON поля
+            document.getElementById('questionsJsonField').value = JSON.stringify(questions);
+            document.getElementById('softQuestionsJsonField').value = JSON.stringify(softQuestions);
+            
+            // Обновляем отображение вопросов в контейнерах
+            const questionsContainer = document.getElementById('questionsContainer');
+            const softQuestionsContainer = document.getElementById('softQuestionsContainer');
+            
+            // Очищаем контейнеры
+            questionsContainer.innerHTML = '';
+            softQuestionsContainer.innerHTML = '';
+            
+            // Добавляем профессиональные вопросы
+            questions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-item mb-3';
+                questionDiv.innerHTML = `
+                    <div class="input-group">
+                        <input type="text" class="form-control" value="${q.text || ''}" placeholder="Введите текст вопроса" onchange="updateQuestionText(${index}, this.value)">
+                        <button type="button" class="btn btn-outline-danger" onclick="removeQuestion(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="mt-2">
+                        <select class="form-select form-select-sm" onchange="updateQuestionType(${index}, this.value)">
+                            <option value="text" ${q.type === 'text' ? 'selected' : ''}>Текстовый ответ</option>
+                            <option value="select" ${q.type === 'select' ? 'selected' : ''}>Один вариант из списка</option>
+                            <option value="multiselect" ${q.type === 'multiselect' ? 'selected' : ''}>Несколько вариантов из списка</option>
+                        </select>
+                    </div>
+                    ${(q.type === 'select' || q.type === 'multiselect') ? `
+                        <div class="mt-2">
+                            <textarea class="form-control form-control-sm" rows="3" placeholder="Варианты ответов (каждый с новой строки)" onchange="updateQuestionOptions(${index}, this.value)">${(q.options || []).join('\n')}</textarea>
+                        </div>
+                    ` : ''}
+                `;
+                questionsContainer.appendChild(questionDiv);
+            });
+            
+            // Добавляем soft-вопросы
+            softQuestions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-item mb-3';
+                questionDiv.innerHTML = `
+                    <div class="input-group">
+                        <input type="text" class="form-control" value="${q.text || ''}" placeholder="Введите текст вопроса" onchange="updateSoftQuestionText(${index}, this.value)">
+                        <button type="button" class="btn btn-outline-danger" onclick="removeSoftQuestion(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                softQuestionsContainer.appendChild(questionDiv);
+            });
+        }
+
+        // Функции для добавления вопросов
+        window.addQuestion = function(text = '', type = 'text') {
+            console.log('Добавление вопроса:', text, type);
+            questions.push({
+                id: questions.length + 1,
+                text: text,
+                type: type,
+                options: []
+            });
+            updateQuestionsDisplay();
+        };
+
+        window.addSoftQuestion = function(text = '', type = 'text') {
+            console.log('Добавление soft-вопроса:', text, type);
+            softQuestions.push({
+                id: softQuestions.length + 1,
+                text: text,
+                type: type
+            });
+            updateQuestionsDisplay();
+        };
+
+        // Функции для обновления вопросов
+        window.updateQuestionText = function(index, value) {
+            console.log('Обновление текста вопроса:', index, value);
+            console.log('Текущие вопросы до обновления:', JSON.stringify(questions));
+            if (questions[index]) {
+                questions[index].text = value;
+                console.log('Текущие вопросы после обновления:', JSON.stringify(questions));
+                updateQuestionsDisplay();
+            }
+        };
+
+        window.updateQuestionType = function(index, value) {
+            console.log('Обновление типа вопроса:', index, value);
+            if (questions[index]) {
+                questions[index].type = value;
+                updateQuestionsDisplay();
+            }
+        };
+
+        window.updateQuestionOptions = function(index, value) {
+            console.log('Обновление опций вопроса:', index, value);
+            if (questions[index]) {
+                questions[index].options = value.split('\n').filter(o => o.trim() !== '');
+                updateQuestionsDisplay();
+            }
+        };
+
+        window.updateSoftQuestionText = function(index, value) {
+            console.log('Обновление текста soft-вопроса:', index, value);
+            if (softQuestions[index]) {
+                softQuestions[index].text = value;
+                updateQuestionsDisplay();
+            }
+        };
+
+        // Функции для удаления вопросов
+        window.removeQuestion = function(index) {
+            console.log('Удаление вопроса:', index);
+            questions.splice(index, 1);
+            // Обновляем id оставшихся вопросов
+            questions.forEach((q, i) => q.id = i + 1);
+            updateQuestionsDisplay();
+        };
+
+        window.removeSoftQuestion = function(index) {
+            console.log('Удаление soft-вопроса:', index);
+            softQuestions.splice(index, 1);
+            // Обновляем id оставшихся вопросов
+            softQuestions.forEach((q, i) => q.id = i + 1);
+            updateQuestionsDisplay();
+        };
+
+        // Инициализация массивов вопросов
+        let questions = [];
+        let softQuestions = [];
+
+        // Загружаем существующие вопросы из скрытых полей
+        const questionsJsonField = document.getElementById('questionsJsonField');
+        const softQuestionsJsonField = document.getElementById('softQuestionsJsonField');
+
+        if (questionsJsonField && questionsJsonField.value) {
+            try {
+                const questionsValue = questionsJsonField.value.trim();
+                console.log('Значение questionsJsonField:', questionsValue);
+                questions = questionsValue ? JSON.parse(questionsValue) : [];
+                console.log('Загружены существующие вопросы:', questions);
+            } catch (e) {
+                console.error('Ошибка при загрузке вопросов:', e);
+                console.error('Проблемное значение:', questionsJsonField.value);
+                questions = [];
+            }
+        }
+
+        if (softQuestionsJsonField && softQuestionsJsonField.value) {
+            try {
+                const softQuestionsValue = softQuestionsJsonField.value.trim();
+                console.log('Значение softQuestionsJsonField:', softQuestionsValue);
+                softQuestions = softQuestionsValue ? JSON.parse(softQuestionsValue) : [];
+                console.log('Загружены существующие soft-вопросы:', softQuestions);
+            } catch (e) {
+                console.error('Ошибка при загрузке soft-вопросов:', e);
+                console.error('Проблемное значение:', softQuestionsJsonField.value);
+                softQuestions = [];
+            }
+        }
+
+        // Добавляем обработчики для кнопок
+        const addQuestionBtn = document.getElementById('addQuestionBtn');
+        const addSoftQuestionBtn = document.getElementById('addSoftQuestionBtn');
+
+        if (addQuestionBtn) {
+            addQuestionBtn.addEventListener('click', function() {
+                console.log('Клик по кнопке добавления вопроса');
+                addQuestion('', 'text');
+            });
+        }
+
+        if (addSoftQuestionBtn) {
+            addSoftQuestionBtn.addEventListener('click', function() {
+                console.log('Клик по кнопке добавления soft-вопроса');
+                addSoftQuestion('', 'text');
+            });
+        }
+
+        // Обработчик отправки формы
+        document.getElementById('vacancyForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // Предотвращаем стандартную отправку формы
+            
+            console.log('Отправка формы');
+            console.log('Финальные вопросы перед отправкой:', JSON.stringify(questions));
+            console.log('Финальные soft-вопросы перед отправкой:', JSON.stringify(softQuestions));
+            
+            // Обновляем скрытые поля с JSON данными
+            const questionsJsonField = document.getElementById('questionsJsonField');
+            const softQuestionsJsonField = document.getElementById('softQuestionsJsonField');
+            
+            questionsJsonField.value = JSON.stringify(questions);
+            softQuestionsJsonField.value = JSON.stringify(softQuestions);
+            
+            console.log('Значение questionsJsonField после обновления:', questionsJsonField.value);
+            console.log('Значение softQuestionsJsonField после обновления:', softQuestionsJsonField.value);
+            
+            // Создаем FormData и добавляем все поля формы
+            const formData = new FormData(this);
+            
+            // Явно добавляем JSON данные
+            formData.set('questions_json', questionsJsonField.value);
+            formData.set('soft_questions_json', softQuestionsJsonField.value);
+            
+            console.log('Данные формы перед отправкой:', {
+                questions_json: formData.get('questions_json'),
+                soft_questions_json: formData.get('soft_questions_json')
+            });
+            
+            // Отправляем форму через fetch
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Ответ сервера:', data);
+                if (data.status === 'success') {
+                    window.location.href = data.redirect || '/vacancies';
+                } else {
+                    alert(data.message || 'Произошла ошибка при сохранении');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка при отправке формы:', error);
+                alert('Произошла ошибка при сохранении');
+            });
+        });
+
+        // Инициализация отображения
+        updateQuestionsDisplay();
+    });
+</script>
 {% endblock %} 

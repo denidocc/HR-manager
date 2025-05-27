@@ -4,14 +4,16 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 from app import db
-from app.models import Vacancy, C_Employment_Type, SystemLog, Candidate
+from app.models import Vacancy, C_Employment_Type, SystemLog, Candidate, User_Selection_Stage
 from app.forms.vacancy import VacancyForm, VacancyAIGeneratorForm
+from app.utils.ai_service import generate_vacancy_with_ai
 import json
 import logging
 import traceback
 from app.utils.decorators import profile_time
-from app.utils.ai_service import generate_vacancy_with_ai
 from datetime import datetime, timezone
+import openai
+from flask import current_app
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
@@ -64,69 +66,67 @@ def create():
         ('', 'Выберите тип занятости')
     ] + [(t.id, t.name) for t in C_Employment_Type.query.all() if t.id != 0]
     
-    if request.method == 'POST':
-        logger.info("Получен POST-запрос для создания вакансии")
-        logger.info(f"Список всех полей формы: {list(request.form.keys())}")
-        
-        # Получаем данные JSON из формы
-        questions_json = request.form.get('questions_json', '[]')
-        soft_questions_json = request.form.get('soft_questions_json', '[]')
-        selection_stages_json = request.form.get('selection_stages_json', '[]')
-        
-        # Логируем для отладки
-        logger.info(f"Получены данные вопросов из запроса: {questions_json}")
-        logger.info(f"Получены данные soft-вопросов из запроса: {soft_questions_json}")
-        logger.info(f"Получены данные этапов отбора из запроса: {selection_stages_json}")
-        logger.info(f"Form data для вопросов: {form.questions_json.data}")
-        logger.info(f"Form data для soft-вопросов: {form.soft_questions_json.data}")
-        logger.info(f"Тип занятости: {form.id_c_employment_type.data}")
-            
-        # Если форма не валидна, логируем ошибки и отображаем форму снова
-        if not form.validate_on_submit():
-            logger.warning(f"Форма не прошла валидацию. Ошибки: {form.errors}")
-            return render_template('vacancies/create.html', form=form, title='Создание вакансии')
-            
-        # Валидация выбора типа занятости
-        if form.id_c_employment_type.data is None:
-            form.id_c_employment_type.errors.append('Выберите тип занятости')
-            return render_template('vacancies/create.html', form=form, title='Создание вакансии')
-        
+    if form.validate_on_submit():
         try:
-            # Конвертируем строковое представление JSON в Python объекты
-            if not questions_json:
-                logger.warning("Поле questions_json пустое, использую пустой список")
-                questions = []
-            else:
-                questions = json.loads(questions_json)
-                logger.info(f"Преобразованы вопросы: {questions}")
-                
-            if not soft_questions_json:
-                logger.warning("Поле soft_questions_json пустое, использую пустой список")
-                soft_questions = []
-            else:
-                soft_questions = json.loads(soft_questions_json)
-                logger.info(f"Преобразованы soft-вопросы: {soft_questions}")
+            # Получаем данные из формы
+            questions_json = request.form.get('questions_json', '[]')
+            soft_questions_json = request.form.get('soft_questions_json', '[]')
             
-            if not selection_stages_json:
-                logger.warning("Поле selection_stages_json пустое, использую пустой список")
-                selection_stages = []
-            else:
-                selection_stages = json.loads(selection_stages_json)
-                logger.info(f"Преобразованы этапы отбора: {selection_stages}")
+            current_app.logger.info("=== Начало обработки данных формы ===")
+            current_app.logger.info(f"Все данные формы: {dict(request.form)}")
+            current_app.logger.info(f"questions_json: {questions_json}")
+            current_app.logger.info(f"soft_questions_json: {soft_questions_json}")
+            
+            # Проверяем и парсим JSON данные
+            try:
+                questions = json.loads(questions_json) if questions_json and questions_json != '[]' else []
+                soft_questions = json.loads(soft_questions_json) if soft_questions_json and soft_questions_json != '[]' else []
                 
-            # Проверяем формат данных
-            if not isinstance(questions, list):
-                logger.error(f"Вопросы не являются списком: {type(questions)}")
-                questions = []
+                current_app.logger.info("=== Распарсенные данные ===")
+                current_app.logger.info(f"questions: {json.dumps(questions, ensure_ascii=False)}")
+                current_app.logger.info(f"soft_questions: {json.dumps(soft_questions, ensure_ascii=False)}")
                 
-            if not isinstance(soft_questions, list):
-                logger.error(f"Soft-вопросы не являются списком: {type(soft_questions)}")
-                soft_questions = []
+                # Проверяем, что данные являются списками
+                if not isinstance(questions, list):
+                    current_app.logger.warning(f"questions не является списком: {type(questions)}")
+                    questions = []
+                if not isinstance(soft_questions, list):
+                    current_app.logger.warning(f"soft_questions не является списком: {type(soft_questions)}")
+                    soft_questions = []
                 
-            if not isinstance(selection_stages, list):
-                logger.error(f"Этапы отбора не являются списком: {type(selection_stages)}")
-                selection_stages = []
+                # Проверяем формат каждого вопроса
+                validated_questions = []
+                for q in questions:
+                    if isinstance(q, dict) and 'text' in q:
+                        validated_questions.append({
+                            'id': len(validated_questions) + 1,
+                            'text': q['text'],
+                            'type': q.get('type', 'text'),
+                            'required': q.get('required', True)
+                        })
                 
+                validated_soft_questions = []
+                for q in soft_questions:
+                    if isinstance(q, dict) and 'text' in q:
+                        validated_soft_questions.append({
+                            'id': len(validated_soft_questions) + 1,
+                            'text': q['text'],
+                            'type': q.get('type', 'text'),
+                            'required': q.get('required', True)
+                        })
+                
+                current_app.logger.info("=== Валидированные данные ===")
+                current_app.logger.info(f"validated_questions: {json.dumps(validated_questions, ensure_ascii=False)}")
+                current_app.logger.info(f"validated_soft_questions: {json.dumps(validated_soft_questions, ensure_ascii=False)}")
+                
+            except json.JSONDecodeError as e:
+                current_app.logger.error(f'Ошибка при парсинге JSON: {str(e)}')
+                current_app.logger.error(f'Проблемные данные:')
+                current_app.logger.error(f'questions_json: {questions_json}')
+                current_app.logger.error(f'soft_questions_json: {soft_questions_json}')
+                flash('Ошибка при обработке вопросов', 'error')
+                return render_template('vacancies/create.html', form=form)
+            
             # Создаем новую вакансию
             vacancy = Vacancy(
                 title=form.title.data,
@@ -134,47 +134,39 @@ def create():
                 description_tasks=form.description_tasks.data,
                 description_conditions=form.description_conditions.data,
                 ideal_profile=form.ideal_profile.data,
-                questions_json=questions,
-                soft_questions_json=soft_questions,
-                selection_stages_json=selection_stages,
+                questions_json=validated_questions,
+                soft_questions_json=validated_soft_questions,
                 is_active=form.is_active.data,
-                created_by=current_user.id
+                created_by=current_user.id,
+                is_ai_generated=request.form.get('is_ai_generated') == 'True',
+                ai_generation_date=datetime.now(timezone.utc) if request.form.get('is_ai_generated') == 'True' else None,
+                ai_generation_prompt=request.form.get('ai_generation_prompt') or None,
+                ai_generation_metadata=json.loads(request.form.get('ai_generation_metadata', '{}'))
             )
             
-            logger.info(f"Создается вакансия с вопросами: {vacancy.questions_json}")
-            logger.info(f"Создается вакансия с soft-вопросами: {vacancy.soft_questions_json}")
-            logger.info(f"Создается вакансия с этапами отбора: {vacancy.selection_stages_json}")
+            current_app.logger.info("=== Данные вакансии перед сохранением ===")
+            current_app.logger.info(f"questions_json: {json.dumps(vacancy.questions_json, ensure_ascii=False)}")
+            current_app.logger.info(f"soft_questions_json: {json.dumps(vacancy.soft_questions_json, ensure_ascii=False)}")
             
             db.session.add(vacancy)
             db.session.commit()
             
-            logger.info(f"Вакансия успешно создана с ID: {vacancy.id}")
-            logger.info(f"Сохраненные вопросы: {vacancy.questions_json}")
-            logger.info(f"Сохраненные soft-вопросы: {vacancy.soft_questions_json}")
-            
-            # Логирование
-            SystemLog.log(
-                event_type="create_vacancy",
-                description=f"Создана новая вакансия: {vacancy.title}",
-                user_id=current_user.id,
-                ip_address=request.remote_addr
-            )
+            current_app.logger.info("=== Вакансия успешно создана ===")
+            current_app.logger.info(f"ID вакансии: {vacancy.id}")
+            current_app.logger.info(f"Сохраненные вопросы:")
+            current_app.logger.info(f"questions_json: {json.dumps(vacancy.questions_json, ensure_ascii=False)}")
+            current_app.logger.info(f"soft_questions_json: {json.dumps(vacancy.soft_questions_json, ensure_ascii=False)}")
             
             flash('Вакансия успешно создана', 'success')
-            return redirect(url_for('vacancies.index'))
+            return redirect(url_for('vacancies.view', id=vacancy.id))
             
-        except json.JSONDecodeError as e:
-            logger.error(f"Ошибка декодирования JSON: {e}")
-            logger.error(f"Строка, вызвавшая ошибку: {questions_json if 'questions_json' in locals() else 'questions_json не определен'}")
-            flash(f'Ошибка в данных вопросов. Пожалуйста, проверьте и попробуйте снова.', 'danger')
-            return render_template('vacancies/create.html', form=form, title='Создание вакансии')
         except Exception as e:
-            logger.error(f"Непредвиденная ошибка: {e}")
-            logger.error(traceback.format_exc())
-            flash(f'Произошла ошибка при создании вакансии: {str(e)}', 'danger')
-            return render_template('vacancies/create.html', form=form, title='Создание вакансии')
+            db.session.rollback()
+            current_app.logger.error(f'Ошибка при создании вакансии: {str(e)}')
+            current_app.logger.error(traceback.format_exc())
+            flash('Произошла ошибка при создании вакансии', 'error')
     
-    return render_template('vacancies/create.html', form=form, title='Создание вакансии')
+    return render_template('vacancies/create.html', form=form)
 
 @vacancies_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 @profile_time
@@ -195,7 +187,6 @@ def edit(id):
         ('', 'Выберите тип занятости')
     ] + [(t.id, t.name) for t in C_Employment_Type.query.all() if t.id != 0]
     
-    # При GET запросе подготавливаем форму с существующими данными
     if request.method == 'GET':
         try:
             # Проверим и преобразуем данные перед передачей в форму
@@ -203,33 +194,18 @@ def edit(id):
                 vacancy.questions_json = []
             if vacancy.soft_questions_json is None:
                 vacancy.soft_questions_json = []
-            if vacancy.selection_stages_json is None:
-                vacancy.selection_stages_json = []
-                
+            
             logger.info(f"Данные вопросов из БД: {vacancy.questions_json}")
             logger.info(f"Данные soft-вопросов из БД: {vacancy.soft_questions_json}")
-            logger.info(f"Данные этапов отбора из БД: {vacancy.selection_stages_json}")
             
             # Проверим, что данные являются списками
             if not isinstance(vacancy.questions_json, list):
                 logger.warning(f"Данные вопросов не являются списком: {type(vacancy.questions_json)}")
                 vacancy.questions_json = []
-                
+            
             if not isinstance(vacancy.soft_questions_json, list):
                 logger.warning(f"Данные soft-вопросов не являются списком: {type(vacancy.soft_questions_json)}")
                 vacancy.soft_questions_json = []
-                
-            if not isinstance(vacancy.selection_stages_json, list):
-                logger.warning(f"Данные этапов отбора не являются списком: {type(vacancy.selection_stages_json)}")
-                vacancy.selection_stages_json = []
-            
-            # Проверим содержат ли вопросы текст
-            has_questions_without_text = False
-            if isinstance(vacancy.questions_json, list):
-                for i, q in enumerate(vacancy.questions_json):
-                    if isinstance(q, dict) and (not q.get('text') or q.get('text') == ''):
-                        logger.warning(f"Вопрос {i+1} не имеет текста: {q}")
-                        has_questions_without_text = True
             
             # Сериализуем в JSON - используем dumps с обеспечением корректного экранирования
             questions_json = json.dumps(vacancy.questions_json, ensure_ascii=False)
@@ -242,75 +218,31 @@ def edit(id):
             logger.info(f"GET: Сериализованные вопросы: {questions_json}")
             logger.info(f"GET: Сериализованные soft-вопросы: {soft_questions_json}")
             
-            if has_questions_without_text:
-                logger.warning("Обнаружены вопросы без текста!")
-                flash('Некоторые вопросы не имеют текста. Пожалуйста, проверьте и заполните их.', 'warning')
-                
         except Exception as e:
             logger.error(f"Ошибка при подготовке данных формы: {e}")
             logger.error(traceback.format_exc())
+            # В случае ошибки используем пустые списки
+            form.questions_json.data = '[]'
+            form.soft_questions_json.data = '[]'
     
     if request.method == 'POST':
         logger.info(f"POST: Редактирование вакансии ID={id}")
         logger.info(f"POST: Список всех полей формы: {list(request.form.keys())}")
-        logger.info(f"POST: Тип занятости: {form.id_c_employment_type.data}")
-        
-        # Если форма не валидна, логируем ошибки
-        if not form.validate_on_submit():
-            logger.warning(f"Форма не прошла валидацию. Ошибки: {form.errors}")
-            return render_template('vacancies/edit.html', form=form, vacancy=vacancy, title='Редактирование вакансии')
-            
-        # Валидация выбора типа занятости
-        if form.id_c_employment_type.data is None:
-            form.id_c_employment_type.errors.append('Выберите тип занятости')
-            return render_template('vacancies/edit.html', form=form, vacancy=vacancy, title='Редактирование вакансии')
         
         # Получаем данные JSON из формы
         questions_json = request.form.get('questions_json', '[]')
         soft_questions_json = request.form.get('soft_questions_json', '[]')
-        selection_stages_json = request.form.get('selection_stages_json', '[]')
         
-        # Логируем для отладки
         logger.info(f"POST: Получены данные вопросов: {questions_json}")
         logger.info(f"POST: Получены данные soft-вопросов: {soft_questions_json}")
-        logger.info(f"POST: Получены данные этапов отбора: {selection_stages_json}")
         
         try:
             # Конвертируем JSON в объекты Python
-            if not questions_json or questions_json.strip() == '':
-                logger.warning("Поле questions_json пустое, использую пустой список")
-                questions = []
-            else:
-                questions = json.loads(questions_json)
-                logger.info(f"POST: Преобразованы вопросы: {questions}")
-                
-            if not soft_questions_json or soft_questions_json.strip() == '':
-                logger.warning("Поле soft_questions_json пустое, использую пустой список")
-                soft_questions = []
-            else:
-                soft_questions = json.loads(soft_questions_json)
-                logger.info(f"POST: Преобразованы soft-вопросы: {soft_questions}")
+            questions = json.loads(questions_json) if questions_json else []
+            soft_questions = json.loads(soft_questions_json) if soft_questions_json else []
             
-            # Обработка этапов отбора
-            if not selection_stages_json or selection_stages_json.strip() == '':
-                logger.warning("Поле selection_stages_json пустое, использую пустой список")
-                selection_stages = []
-            else:
-                selection_stages = json.loads(selection_stages_json)
-                logger.info(f"POST: Преобразованы этапы отбора: {selection_stages}")
-            
-            # Проверяем формат данных
-            if not isinstance(questions, list):
-                logger.error(f"Вопросы не являются списком: {type(questions)}")
-                questions = []
-                
-            if not isinstance(soft_questions, list):
-                logger.error(f"Soft-вопросы не являются списком: {type(soft_questions)}")
-                soft_questions = []
-                
-            if not isinstance(selection_stages, list):
-                logger.error(f"Этапы отбора не являются списком: {type(selection_stages)}")
-                selection_stages = []
+            logger.info(f"POST: Преобразованы вопросы: {questions}")
+            logger.info(f"POST: Преобразованы soft-вопросы: {soft_questions}")
             
             # Обновляем данные вакансии
             vacancy.title = form.title.data
@@ -320,12 +252,7 @@ def edit(id):
             vacancy.ideal_profile = form.ideal_profile.data
             vacancy.questions_json = questions
             vacancy.soft_questions_json = soft_questions
-            vacancy.selection_stages_json = selection_stages
             vacancy.is_active = form.is_active.data
-            
-            logger.info(f"POST: Обновляем вакансию с вопросами: {vacancy.questions_json}")
-            logger.info(f"POST: Обновляем вакансию с soft-вопросами: {vacancy.soft_questions_json}")
-            logger.info(f"POST: Обновляем вакансию с этапами отбора: {vacancy.selection_stages_json}")
             
             db.session.commit()
             
@@ -341,17 +268,37 @@ def edit(id):
                 ip_address=request.remote_addr
             )
             
+            # Если это AJAX запрос, возвращаем JSON
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Вакансия успешно обновлена',
+                    'redirect': url_for('vacancies.index')
+                })
+            
             flash('Вакансия успешно обновлена', 'success')
             return redirect(url_for('vacancies.index'))
             
         except json.JSONDecodeError as e:
             logger.error(f"Ошибка декодирования JSON: {e}")
-            logger.error(f"Строка, вызвавшая ошибку: {questions_json if 'questions_json' in locals() else 'questions_json не определен'}")
-            flash(f'Ошибка в данных вопросов. Пожалуйста, проверьте и попробуйте снова.', 'danger')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Ошибка в данных вопросов'
+                }), 400
+            
+            flash('Ошибка в данных вопросов', 'danger')
             return render_template('vacancies/edit.html', form=form, vacancy=vacancy, title='Редактирование вакансии')
+            
         except Exception as e:
             logger.error(f"Непредвиденная ошибка: {e}")
             logger.error(traceback.format_exc())
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'error',
+                    'message': str(e)
+                }), 500
+            
             flash(f'Произошла ошибка при обновлении вакансии: {str(e)}', 'danger')
             return render_template('vacancies/edit.html', form=form, vacancy=vacancy, title='Редактирование вакансии')
     
@@ -451,7 +398,7 @@ def candidates(id):
 @profile_time
 @login_required
 def archive(id):
-    """Архивация или восстановление вакансии"""
+    """Архивация вакансии"""
     vacancy = Vacancy.query.get_or_404(id)
     
     # Проверяем, принадлежит ли вакансия текущему пользователю
@@ -459,121 +406,68 @@ def archive(id):
         flash('У вас нет доступа к архивации этой вакансии', 'danger')
         return redirect(url_for('vacancies.index'))
     
-    # Инвертируем текущий статус
-    vacancy.is_active = not vacancy.is_active
-    
-    # Сохраняем изменения
-    db.session.commit()
-    
-    # Логирование
-    action = "восстановление" if vacancy.is_active else "архивация"
-    SystemLog.log(
-        event_type=f"vacancy_{action}",
-        description=f"{action.capitalize()} вакансии ID={vacancy.id}: {vacancy.title}",
-        user_id=current_user.id,
-        ip_address=request.remote_addr
-    )
-    
-    flash(f'Вакансия успешно {"восстановлена" if vacancy.is_active else "архивирована"}', 'success')
-    return redirect(url_for('vacancies.index'))
-
-@vacancies_bp.route('/generate-with-ai', methods=['POST'])
-@profile_time
-@login_required
-def generate_with_ai():
-    """Генерация вакансии с помощью ИИ"""
-    # Подробное логирование полученных данных
-    logger.info(f"Получены данные для генерации вакансии: {request.form}")
-    logger.info(f"id_c_employment_type из формы: {request.form.get('id_c_employment_type')}")
-    logger.info(f"Тип данных id_c_employment_type: {type(request.form.get('id_c_employment_type'))}")
-    
-    # Проверяем наличие всех необходимых полей
-    required_fields = ['title', 'id_c_employment_type', 'description_tasks', 'description_conditions']
-    errors = {}
-    
-    for field in required_fields:
-        if not request.form.get(field):
-            errors[field] = ['Это поле обязательно']
-    
-    if errors:
-        logger.warning(f"Форма генерации вакансии не прошла валидацию. Ошибки: {errors}")
-        return jsonify({
-            'status': 'error',
-            'message': 'Форма содержит ошибки. Пожалуйста, проверьте введенные данные.',
-            'errors': errors
-        }), 400
-    
     try:
-        # Получаем данные из формы
-        title = request.form.get('title')
-        id_c_employment_type_str = request.form.get('id_c_employment_type')
-        description_tasks = request.form.get('description_tasks')
-        description_conditions = request.form.get('description_conditions')
-        
-        # Проверяем, что id_c_employment_type не пустой
-        if not id_c_employment_type_str:
-            logger.error(f"Пустой тип занятости: {id_c_employment_type_str}")
-            return jsonify({
-                'status': 'error',
-                'message': 'Выберите корректный тип занятости.',
-                'errors': {'id_c_employment_type': ['Выберите тип занятости']}
-            }), 400
-        
-        # Преобразуем в int только если прошли валидацию
-        id_c_employment_type = int(id_c_employment_type_str)
-        
-        # Получаем тип занятости
-        employment_type = C_Employment_Type.query.get(id_c_employment_type)
-        if not employment_type:
-            logger.error(f"Тип занятости с ID={id_c_employment_type} не найден")
-            return jsonify({
-                'status': 'error',
-                'message': 'Выбранный тип занятости не найден.'
-            }), 404
-        
-        # Логируем данные формы для отладки
-        logger.info(f"Генерация вакансии с помощью ИИ. Данные формы: title={title}, employment_type={employment_type.name}, id_c_employment_type={id_c_employment_type}")
-        
-        # Генерируем вакансию с помощью ИИ
-        vacancy_data = generate_vacancy_with_ai(
-            title=title,
-            employment_type=employment_type.name,
-            description_tasks=description_tasks,
-            description_conditions=description_conditions
-        )
-        
-        if not vacancy_data:
-            return jsonify({
-                'status': 'error',
-                'message': 'Не удалось сгенерировать вакансию. Пожалуйста, попробуйте еще раз.'
-            }), 500
+        # Меняем статус на архивный
+        vacancy.is_active = False
+        db.session.commit()
         
         # Логирование
         SystemLog.log(
-            event_type="generate_vacancy_with_ai",
-            description=f"Сгенерирована вакансия с помощью ИИ: {vacancy_data['title']}",
+            event_type="archive_vacancy",
+            description=f"Вакансия архивирована: {vacancy.title}",
             user_id=current_user.id,
             ip_address=request.remote_addr
         )
         
+        flash('Вакансия успешно архивирована', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Ошибка при архивации вакансии: {str(e)}")
+        flash('Произошла ошибка при архивации вакансии', 'danger')
+    
+    return redirect(url_for('vacancies.index'))
+
+@vacancies_bp.route('/generate_with_ai', methods=['POST'])
+@profile_time
+@login_required
+def generate_with_ai():
+    """Генерация вакансии с помощью AI"""
+    try:
+        # Получаем данные из формы
+        title = request.form.get('title')
+        employment_type = request.form.get('id_c_employment_type')
+        description_tasks = request.form.get('description_tasks')
+        description_conditions = request.form.get('description_conditions')
+        
+        current_app.logger.info(f"Отправляем запрос к OpenAI API для генерации вакансии: {title}")
+        
+        # Генерируем вакансию с помощью AI
+        result = generate_vacancy_with_ai(
+            title=title,
+            employment_type=employment_type,
+            description_tasks=description_tasks,
+            description_conditions=description_conditions
+        )
+        
+        current_app.logger.info(f"Получен ответ от OpenAI API: {json.dumps(result, ensure_ascii=False)}")
+        
+        # Проверяем структуру данных
+        if 'questions' in result:
+            current_app.logger.info(f"Вопросы в ответе: {json.dumps(result['questions'], ensure_ascii=False)}")
+        if 'soft_questions' in result:
+            current_app.logger.info(f"Soft вопросы в ответе: {json.dumps(result['soft_questions'], ensure_ascii=False)}")
+        
         return jsonify({
             'status': 'success',
-            'message': 'Вакансия успешно сгенерирована',
-            'data': vacancy_data
+            'data': result
         })
         
-    except ValueError as e:
-        logger.error(f"Ошибка при преобразовании значения: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': 'Некорректное значение типа занятости'
-        }), 400
     except Exception as e:
-        logger.error(f"Ошибка при генерации вакансии с помощью ИИ: {e}")
-        logger.error(traceback.format_exc())
+        current_app.logger.error(f'Ошибка при генерации вакансии: {str(e)}')
+        current_app.logger.error(traceback.format_exc())
         return jsonify({
             'status': 'error',
-            'message': f'Произошла ошибка при генерации вакансии: {str(e)}'
+            'message': str(e)
         }), 500
 
 @vacancies_bp.route('/update_selection_stages/<int:id>', methods=['POST'])
@@ -640,3 +534,42 @@ def get_default_stages():
     ]
     
     return jsonify(default_stages)
+
+@vacancies_bp.route('/<int:id>/delete', methods=['POST'])
+@profile_time
+@login_required
+def delete(id):
+    """Удаление вакансии"""
+    vacancy = Vacancy.query.get_or_404(id)
+    
+    # Проверяем, принадлежит ли вакансия текущему пользователю
+    if vacancy.created_by != current_user.id:
+        flash('У вас нет доступа к удалению этой вакансии', 'danger')
+        return redirect(url_for('vacancies.index'))
+    
+    try:
+        # Проверяем, есть ли связанные кандидаты
+        candidates_count = Candidate.query.filter_by(vacancy_id=vacancy.id).count()
+        if candidates_count > 0:
+            flash('Невозможно удалить вакансию, так как есть связанные кандидаты', 'danger')
+            return redirect(url_for('vacancies.index'))
+        
+        # Удаляем вакансию
+        db.session.delete(vacancy)
+        db.session.commit()
+        
+        # Логирование
+        SystemLog.log(
+                event_type="delete_vacancy",
+                description=f"Удалена вакансия: {vacancy.title}",
+            user_id=current_user.id,
+            ip_address=request.remote_addr
+        )
+    
+        flash('Вакансия успешно удалена', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Ошибка при удалении вакансии: {str(e)}")
+        flash('Произошла ошибка при удалении вакансии', 'danger')
+    
+    return redirect(url_for('vacancies.index')) 

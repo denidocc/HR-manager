@@ -21,6 +21,7 @@ from threading import Thread
 import logging
 from app import db
 from app.models.candidate import Candidate
+import traceback
 
 # Настройка логгера для использования вне контекста приложения
 logger = logging.getLogger('resume_processor')
@@ -1702,15 +1703,6 @@ def analyze_vacancy_requirements(vacancy_description):
 def generate_vacancy_with_ai(title, employment_type, description_tasks, description_conditions):
     """
     Генерирует полные данные вакансии с помощью OpenAI API на основе базовой информации
-    
-    Args:
-        title (str): Название вакансии
-        employment_type (str): Тип занятости
-        description_tasks (str): Базовое описание задач
-        description_conditions (str): Базовые условия работы
-        
-    Returns:
-        dict: Словарь с сгенерированными данными для вакансии или None в случае ошибки
     """
     try:
         # Получаем API ключ из конфигурации или переменных окружения
@@ -1752,13 +1744,13 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
             "description_conditions": "Расширенные условия работы",
             "ideal_profile": "Описание идеального кандидата",
             "questions": [
-                {{"id": 1, "text": "Вопрос 1", "type": "text"}},
-                {{"id": 2, "text": "Вопрос 2", "type": "text"}},
+                {{"id": 1, "text": "Вопрос 1", "type": "text", "required": true}},
+                {{"id": 2, "text": "Вопрос 2", "type": "text", "required": true}},
                 ...
             ],
             "soft_questions": [
-                {{"id": 1, "text": "Вопрос 1", "type": "text"}},
-                {{"id": 2, "text": "Вопрос 2", "type": "text"}},
+                {{"id": 1, "text": "Вопрос 1", "type": "text", "required": true}},
+                {{"id": 2, "text": "Вопрос 2", "type": "text", "required": true}},
                 ...
             ]
         }}
@@ -1770,6 +1762,8 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
         - Ответ должен быть только в формате JSON без дополнительного текста
         """
         
+        current_app.logger.info(f"Отправляем запрос к OpenAI API для генерации вакансии: {title}")
+        
         # Отправляем запрос к OpenAI API
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -1778,22 +1772,19 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=4000
+            max_tokens=4000,
+            response_format={"type": "json_object"}
         )
         
         # Получаем ответ
         result = response.choices[0].message.content
-        
-        # Проверяем, что ответ содержит валидный JSON
-        # Ищем JSON в ответе (на случай, если модель добавила лишний текст)
-        import re
-        json_match = re.search(r'({[\s\S]*})', result)
-        if json_match:
-            result = json_match.group(1)
+        current_app.logger.info(f"Получен ответ от OpenAI API: {result[:500]}...")
         
         # Парсим JSON
         try:
             vacancy_data = json.loads(result)
+            current_app.logger.info(f"Успешно распарсен JSON. Вопросы: {json.dumps(vacancy_data.get('questions', []), ensure_ascii=False)}")
+            current_app.logger.info(f"Soft вопросы: {json.dumps(vacancy_data.get('soft_questions', []), ensure_ascii=False)}")
             
             # Проверяем наличие всех необходимых полей
             required_fields = ['title', 'description_tasks', 'description_conditions', 'ideal_profile', 'questions', 'soft_questions']
@@ -1809,13 +1800,14 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
             # Проверяем и корректируем формат вопросов
             for question_type in ['questions', 'soft_questions']:
                 if not isinstance(vacancy_data[question_type], list):
+                    current_app.logger.warning(f"Поле {question_type} не является списком: {type(vacancy_data[question_type])}")
                     vacancy_data[question_type] = []
                 else:
                     # Проверяем каждый вопрос и добавляем id и type, если их нет
                     for i, q in enumerate(vacancy_data[question_type]):
                         if isinstance(q, str):
                             # Если вопрос - это просто строка, преобразуем его в словарь
-                            vacancy_data[question_type][i] = {"id": i+1, "text": q, "type": "text"}
+                            vacancy_data[question_type][i] = {"id": i+1, "text": q, "type": "text", "required": True}
                         elif isinstance(q, dict):
                             # Если вопрос - словарь, проверяем наличие необходимых полей
                             if 'id' not in q:
@@ -1824,6 +1816,8 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
                                 q['text'] = f"Вопрос {i+1}"
                             if 'type' not in q:
                                 q['type'] = "text"
+                            if 'required' not in q:
+                                q['required'] = True
             
             # Ограничиваем количество вопросов до 7
             if len(vacancy_data['questions']) > 7:
@@ -1831,8 +1825,25 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
             if len(vacancy_data['soft_questions']) > 7:
                 vacancy_data['soft_questions'] = vacancy_data['soft_questions'][:7]
                 
-        except json.JSONDecodeError:
+            # Добавляем метаданные о генерации
+            from datetime import datetime
+            vacancy_data.update({
+                'is_ai_generated': True,
+                'ai_generation_date': datetime.now().isoformat(),
+                'ai_generation_prompt': prompt,
+                'ai_generation_metadata': {
+                    'model': 'gpt-4o',
+                    'temperature': 0.7,
+                    'max_tokens': 4000,
+                    'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
+            
+            current_app.logger.info(f"Финальные данные вакансии: {json.dumps(vacancy_data, ensure_ascii=False)[:1000]}...")
+                
+        except json.JSONDecodeError as e:
             current_app.logger.error(f"Не удалось распарсить JSON из ответа API: {result[:500]}")
+            current_app.logger.error(f"Ошибка: {str(e)}")
             return None
         
         # Логируем успешную генерацию
@@ -1842,4 +1853,5 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
         
     except Exception as e:
         current_app.logger.error(f"Ошибка при генерации вакансии с помощью AI: {str(e)}")
-        return None 
+        current_app.logger.error(traceback.format_exc())
+        return None

@@ -13,9 +13,9 @@ class Vacancy(db.Model):
     description_tasks: so.Mapped[str] = so.mapped_column(sa.Text, nullable=False)
     description_conditions: so.Mapped[str] = so.mapped_column(sa.Text, nullable=False)
     ideal_profile: so.Mapped[str] = so.mapped_column(sa.Text, nullable=False)
-    questions_json: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: [])
-    soft_questions_json: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: [])
-    selection_stages_json: so.Mapped[dict] = so.mapped_column(sa.JSON, default=lambda: [], nullable=True)  # Этапы отбора для вакансии
+    questions_json: so.Mapped[list] = so.mapped_column(sa.JSON, default=lambda: [])
+    soft_questions_json: so.Mapped[list] = so.mapped_column(sa.JSON, default=lambda: [])
+    selection_stages_json: so.Mapped[list] = so.mapped_column(sa.JSON, default=lambda: [], nullable=True)  # Этапы отбора для вакансии
     is_active: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=True)
     status: so.Mapped[str] = so.mapped_column(sa.Text, default='active')  # active, closed, archived
     location: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)  # город или регион

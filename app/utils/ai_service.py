@@ -1854,4 +1854,4 @@ def generate_vacancy_with_ai(title, employment_type, description_tasks, descript
     except Exception as e:
         current_app.logger.error(f"Ошибка при генерации вакансии с помощью AI: {str(e)}")
         current_app.logger.error(traceback.format_exc())
-        return None
+        return None 

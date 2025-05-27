@@ -13,7 +13,7 @@
     <div class="card mb-4">
         <div class="card-body">
             <form method="get" class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-5">
                     <label for="vacancy_id" class="form-label">Вакансия</label>
                     <select class="form-select" id="vacancy_id" name="vacancy_id">
                         <option value="">Все вакансии</option>
@@ -24,14 +24,14 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-5">
                     <label for="sort_by" class="form-label">Сортировка</label>
                     <select class="form-select" id="sort_by" name="sort_by">
                         <option value="date" {% if sort_by == 'date' %}selected{% endif %}>По дате</option>
                         <option value="match" {% if sort_by == 'match' %}selected{% endif %}>По совпадению</option>
                     </select>
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
+                <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary">Применить</button>
                 </div>
             </form>
@@ -44,7 +44,7 @@
             <div class="kanban-column-header" style="background: {{ stage.color }};">
                 {{ stage.name }} <span class="kanban-count">{{ kanban_board[stage.id]|length }}</span>
             </div>
-            <div class="kanban-column-body">
+            <div class="kanban-column-body p-3">
                 {% for candidate in kanban_board[stage.id] %}
                 <a href="{{ url_for('candidates.view', id=candidate.id) }}" class="kanban-card-link">
                     <div class="kanban-card" draggable="true" data-candidate-id="{{ candidate.id }}">

@@ -68,7 +68,6 @@ class ApplicationForm(FlaskForm):
     
     # Поле для загрузки резюме
     resume = FileField('Резюме', validators=[
-        FileRequired(message='Загрузите файл резюме'),
         FileAllowed(['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'], 
                    message='Допустимые форматы: PDF, DOC, DOCX, JPG, PNG')
     ])

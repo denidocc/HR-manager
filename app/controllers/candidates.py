@@ -285,7 +285,7 @@ def change_status(id):
     candidate = Candidate.query.get_or_404(id)
     
     # Проверяем, что кандидат принадлежит вакансии текущего HR
-    if not candidate.vacancy or candidate.vacancy.creator != current_user.id:
+    if not candidate.vacancy or candidate.vacancy.created_by != current_user.id:
         flash('У вас нет доступа к этому кандидату', 'danger')
         return redirect(url_for('candidates.index'))
     
@@ -294,14 +294,28 @@ def change_status(id):
         flash('Не указан этап отбора', 'danger')
         return redirect(url_for('candidates.view', id=id))
     
-    # Проверяем, что этап принадлежит текущему HR
+    # Проверяем существование этапа
     stage = C_Selection_Stage.query.get_or_404(stage_id)
-    if stage.id_hr != current_user.id:
-        flash('У вас нет доступа к этому этапу отбора', 'danger')
-        return redirect(url_for('candidates.view', id=id))
+    
+    # Проверяем, есть ли связь с этапом для текущего пользователя
+    user_stage = User_Selection_Stage.query.filter_by(
+        user_id=current_user.id,
+        stage_id=stage_id
+    ).first()
+    
+    if not user_stage:
+        # Если связи нет, создаем ее
+        user_stage = User_Selection_Stage(
+            user_id=current_user.id,
+            stage_id=stage_id,
+            order=stage.order,
+            is_active=True
+        )
+        db.session.add(user_stage)
     
     # Обновляем этап отбора
     candidate.stage_id = stage_id
+    candidate.user_id = current_user.id
     
     # Логируем изменение
     SystemLog.log(
@@ -313,10 +327,9 @@ def change_status(id):
     
     # Создаем уведомление
     notification = Notification(
-        user_id=current_user.id,
-        title='Изменение этапа отбора',
-        message=f'Кандидат {candidate.full_name} переведен на этап "{stage.name}"',
-        type='info'
+        candidate_id=candidate.id,
+        type="status_update",
+        message=f'Кандидат {candidate.full_name} переведен на этап "{stage.name}"'
     )
     db.session.add(notification)
     

@@ -541,9 +541,20 @@
                 
                 // Заполняем метаданные генерации
                 document.getElementById('is_ai_generated').value = 'True';
-                document.getElementById('ai_generation_date').value = data.data.ai_generation_date || '';
-                document.getElementById('ai_generation_prompt').value = data.data.ai_generation_prompt || '';
-                document.getElementById('ai_generation_metadata').value = JSON.stringify(data.data.ai_generation_metadata || {});
+                document.getElementById('ai_generation_date').value = new Date().toISOString();
+                document.getElementById('ai_generation_prompt').value = JSON.stringify({
+                    title: document.getElementById('ai_title').value,
+                    employment_type: document.getElementById('ai_employment_type').value,
+                    description_tasks: document.getElementById('ai_description_tasks').value,
+                    description_conditions: document.getElementById('ai_description_conditions').value
+                });
+                document.getElementById('ai_generation_metadata').value = JSON.stringify({
+                    model: data.data.model || 'gpt-4o',
+                    temperature: data.data.temperature || 0.7,
+                    generation_time: data.data.generation_time || null,
+                    tokens_used: data.data.tokens_used || null,
+                    version: data.data.version || '1.0'
+                });
                 
                 // Закрываем модальное окно через 2 секунды
                 setTimeout(() => {

@@ -42,8 +42,8 @@
                         <dt class="col-sm-4">Этап отбора:</dt>
                         <dd class="col-sm-8">
                             <span id="statusBadge" class="badge rounded-pill" 
-                                  style="background-color: {{ candidate.stage_id.color if candidate.selection_stage else 'secondary' }}">
-                                {{ candidate.stage_id.name if candidate.selection_stage else 'Заявка подана' }}
+                                  style="background-color: {{ candidate.selection_stage.color }}">
+                                {{ candidate.selection_stage.name }}
                             </span>
                         </dd>
                         
@@ -55,7 +55,13 @@
                         <dt class="col-sm-4">Трекинг-код:</dt>
                         <dd class="col-sm-8">{{ candidate.tracking_code }}</dd>
                     </dl>
-                    
+                    {% if candidate.resume_path %}
+                    <div class="col-md-12 mb-4">
+                        <a href="{{ resume_file_url }}" class="btn btn-sm btn-primary" download>
+                            <i class="fas fa-download me-1"></i>Скачать резюме
+                        </a>
+                    </div>
+                    {% endif %}
                     <!-- Форма изменения этапа отбора -->
                     <div class="mt-4">
                         <h5>Изменить этап отбора</h5>
@@ -65,7 +71,7 @@
                                 <label for="stage-select" class="form-label">Этап отбора</label>
                                 <select name="stage_id" class="form-select" id="stage-select">
                                     {% for stage in stages %}
-                                    <option value="{{ stage.id }}" {% if candidate.stage_id == stage.id %}selected{% endif %}>{{ stage.name }}</option>
+                                        <option value="{{ stage.id }}" {% if candidate.stage_id == stage.id %}selected{% endif %} style="background-color: {{ stage.color }};">{{ stage.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -87,52 +93,6 @@
                                 <button type="submit" class="btn btn-primary">Обновить этап отбора</button>
                             </div>
                         </form>
-                    </div>
-                    
-                    <!-- Отображение этапов отбора вакансии -->
-                    <div class="mt-4">
-                        <h5>Этапы отбора для вакансии</h5>
-                        <ul class="list-group">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <div><strong>Новая заявка</strong></div>
-                                {% if candidate.stage_id == 0 %}
-                                <span class="badge bg-primary rounded-pill">Текущий этап</span>
-                                {% endif %}
-                            </li>
-                            
-                            {% if candidate.vacancy and candidate.vacancy.selection_stages_json %}
-                                {% for stage in candidate.vacancy.selection_stages_json %}
-                                    {% set stage_index = loop.index %}
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <strong>{{ stage.name }}</strong>
-                                            <p class="mb-0 small text-muted">{{ stage.description }}</p>
-                                        </div>
-                                        {% if candidate.stage_id == stage_index %}
-                                        <span class="badge bg-primary rounded-pill">Текущий этап</span>
-                                        {% endif %}
-                                    </li>
-                                {% endfor %}
-                            {% else %}
-                                <li class="list-group-item">
-                                    <div class="text-muted">Для этой вакансии не настроены индивидуальные этапы отбора</div>
-                                </li>
-                            {% endif %}
-                            
-                            <!-- Финальные статусы всегда показываем -->
-                            <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-success">
-                                <div><strong>Принят на работу</strong></div>
-                                {% if candidate.stage_id == 4 %}
-                                <span class="badge bg-primary rounded-pill">Текущий этап</span>
-                                {% endif %}
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-danger">
-                                <div><strong>Отклонен</strong></div>
-                                {% if candidate.stage_id == 5 %}
-                                <span class="badge bg-primary rounded-pill">Текущий этап</span>
-                                {% endif %}
-                            </li>
-                        </ul>
                     </div>
                     
                     <!-- Форма добавления комментария -->
@@ -164,7 +124,7 @@
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Загрузка...</span>
                         </div>
-                        <p class="mt-2">Выполняется AI-анализ кандидата...</p>
+                        <p class="mt-2">Выполняется AI-анализ кандидата... Это может занять некоторое время.</p>
                     </div>
                     
                     {% if candidate.ai_match_percent is not none %}
@@ -422,8 +382,8 @@
                                 <div class="mt-2">
                                     <span class="badge bg-warning text-dark">Уровень серьезности: {{ candidate.ai_data_consistency.severity }}</span>
                                     <span class="badge bg-info">Уровень доверия: {{ candidate.ai_data_consistency.trust_score }}%</span>
-                                                    </div>
-                                                </div>
+                                </div>
+                            </div>
                             
                             <!-- Вопросы для интервью -->
                             <div class="card mt-3">
@@ -576,47 +536,6 @@
             </div>
         </div>
         
-        <!-- Резюме кандидата -->
-        <div class="col-md-12 mb-4">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0">Резюме кандидата</h4>
-                    <div class="btn-group">
-                    {% if resume_file_url %}
-                    <a href="{{ resume_file_url }}" class="btn btn-sm text-light" download>
-                        <i class="fas fa-download me-1"></i>Скачать оригинал
-                    </a>
-                    {% endif %}
-                        {% if candidate.resume_path %}
-                        <button type="button" id="reprocessResumeBtn" class="btn text-light ms-2">
-                            <i class="fas fa-sync-alt me-1"></i>Распознать текст
-                        </button>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="card-body">
-                    <!-- Индикатор загрузки -->
-                    <div id="resumeProcessingLoader" class="text-center my-3 d-none">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Загрузка...</span>
-                        </div>
-                        <p class="mt-2">Распознавание текста</p>
-                    </div>
-                    
-                    <div id="resumeTextContainer">
-                        {% if candidate.resume_text %}
-                        <div class="resume-text-box p-3 bg-light rounded border mb-3">
-                            <pre class="mb-0">{{ candidate.resume_text | replace('```', '') | replace('`', '') }}</pre>
-                    </div>
-                    {% else %}
-                        <div class="alert alert-warning">
-                            Текст резюме не распознан. Нажмите кнопку "Распознать текст через OpenAI" для обработки.
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}

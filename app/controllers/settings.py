@@ -8,6 +8,7 @@ from app.models.user import User
 from app.models.c_selection_stage import C_Selection_Stage
 from app.models.user_selection_stages import User_Selection_Stage
 from app.models.c_selection_status import C_Selection_Status
+from app.forms.selection_stage import SelectionStageForm
 from functools import wraps
 import json
 import sqlalchemy as sa
@@ -124,88 +125,58 @@ def selection_stages():
     # Получаем этапы отбора текущего пользователя или стандартные, если нет собственных
     stages = current_user.get_selection_stages()
     
-    if request.method == 'POST':
+    # Создаем форму
+    form = SelectionStageForm()
+    
+    # Заполняем choices для SelectField
+    available_stages = C_Selection_Stage.query.filter_by(is_standard=True).all()
+    form.stage.choices = [(stage.id, stage.name) for stage in available_stages]
+    
+    if form.validate_on_submit():
         try:
-            # Получаем данные о этапах отбора из формы
-            stages_data = json.loads(request.form.get('stages_data', '[]'))
-            
-            # Получаем статус "В процессе" для новых этапов
-            in_progress_status = C_Selection_Status.query.filter_by(name='В процессе').first()
-            if not in_progress_status:
-                flash('Ошибка: статус "В процессе" не найден в базе данных.', 'danger')
+            # Получаем выбранный этап
+            stage = C_Selection_Stage.query.get(form.stage.data)
+            if not stage:
+                flash('Выбранный этап не найден', 'danger')
                 return redirect(url_for('settings_bp.selection_stages'))
             
-            # Удаляем существующие связи пользователя с этапами отбора
-            User_Selection_Stage.query.filter_by(user_id=current_user.id).delete()
+            # Проверяем, не добавлен ли уже этот этап
+            existing_stage = User_Selection_Stage.query.filter_by(
+                user_id=current_user.id,
+                stage_id=stage.id
+            ).first()
             
-            # Создаем новые этапы или связываем с существующими
-            for i, stage_data in enumerate(stages_data):
-                stage_id = stage_data.get('id')
-                
-                if stage_id:
-                    # Проверяем, существует ли этап с таким ID
-                    stage = C_Selection_Stage.query.get(stage_id)
-                    if not stage:
-                        # Если нет, создаем новый
-                        stage = C_Selection_Stage(
-                            name=stage_data['name'],
-                            description=stage_data.get('description', ''),
-                            color=stage_data.get('color', '#6c757d'),
-                            order=i + 1,
-                            is_active=stage_data.get('is_active', True),
-                            is_standard=False,
-                            id_c_selection_status=in_progress_status.id
-                        )
-                        db.session.add(stage)
-                        db.session.flush()  # Получаем ID нового этапа
-                    else:
-                        # Если этап стандартный (is_standard=True), создаем его копию
-                        if stage.is_standard:
-                            new_stage = C_Selection_Stage(
-                                name=stage_data['name'],
-                                description=stage_data.get('description', ''),
-                                color=stage_data.get('color', '#6c757d'),
-                                order=i + 1,
-                                is_active=stage_data.get('is_active', True),
-                                is_standard=False,
-                                id_c_selection_status=in_progress_status.id
-                            )
-                            db.session.add(new_stage)
-                            db.session.flush()  # Получаем ID нового этапа
-                            stage = new_stage
-                else:
-                    # Создаем новый этап
-                    stage = C_Selection_Stage(
-                        name=stage_data['name'],
-                        description=stage_data.get('description', ''),
-                        color=stage_data.get('color', '#6c757d'),
-                        order=i + 1,
-                        is_active=stage_data.get('is_active', True),
-                        is_standard=False,
-                        id_c_selection_status=in_progress_status.id
-                    )
-                    db.session.add(stage)
-                    db.session.flush()  # Получаем ID нового этапа
-                
-                # Создаем связь между пользователем и этапом
-                user_stage = User_Selection_Stage(
-                    user_id=current_user.id,
-                    stage_id=stage.id,
-                    order=i + 1,
-                    is_active=stage_data.get('is_active', True)
-                )
-                db.session.add(user_stage)
-                
-            # Сохраняем изменения
+            if existing_stage:
+                flash('Этот этап уже добавлен в ваши этапы отбора', 'warning')
+                return redirect(url_for('settings_bp.selection_stages'))
+            
+            # Получаем максимальный порядок
+            max_order = db.session.query(func.max(User_Selection_Stage.order))\
+                .filter_by(user_id=current_user.id).scalar() or 0
+            
+            # Создаем новую связь
+            user_stage = User_Selection_Stage(
+                user_id=current_user.id,
+                stage_id=stage.id,
+                order=max_order + 1,
+                is_active=form.is_active.data
+            )
+            
+            db.session.add(user_stage)
             db.session.commit()
-            flash('Этапы отбора успешно обновлены!', 'success')
+            
+            flash('Этап отбора успешно добавлен!', 'success')
             return redirect(url_for('settings_bp.selection_stages'))
+            
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f"Ошибка при обновлении этапов отбора: {str(e)}")
-            flash('Произошла ошибка при обновлении этапов отбора.', 'danger')
+            current_app.logger.error(f"Ошибка при добавлении этапа отбора: {str(e)}")
+            flash('Произошла ошибка при добавлении этапа отбора.', 'danger')
     
-    return render_template('settings/selection_stages.html', title='Настройка этапов отбора', stages=stages)
+    return render_template('settings/selection_stages.html', 
+                         title='Настройка этапов отбора', 
+                         stages=stages,
+                         form=form)
 
 # API для работы с этапами отбора
 @settings_bp.route('/api/selection-stages', methods=['GET'])
@@ -261,21 +232,16 @@ def api_reset_selection_stages():
 def api_delete_selection_stage(stage_id):
     """Удаление этапа отбора из списка пользователя"""
     try:
-        stage = C_Selection_Stage.query.get_or_404(stage_id)
+        # Проверяем существование связи
+        user_stage = User_Selection_Stage.query.filter_by(
+            user_id=current_user.id,
+            stage_id=stage_id
+        ).first_or_404()
         
-        # Если этап стандартный, просто удаляем связь с пользователем
-        if stage.is_default:
-            if stage in current_user.selection_stages:
-                current_user.selection_stages.remove(stage)
-        else:
-            # Проверяем, принадлежит ли этап текущему пользователю
-            if stage in current_user.selection_stages:
-                current_user.selection_stages.remove(stage)
-                # Удаляем этап, если он не используется другими пользователями
-                if not stage.users:
-                    db.session.delete(stage)
-        
+        # Удаляем связь
+        db.session.delete(user_stage)
         db.session.commit()
+        
         return jsonify({'status': 'success'})
     except Exception as e:
         db.session.rollback()

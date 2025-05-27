@@ -32,10 +32,10 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Настройка этапов отбора</h5>
                     <div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="resetStagesBtn">
+                        <button type="button" class="btn btn-sm btn-secondary me-2" id="resetStagesBtn">
                             <i class="fas fa-undo me-1"></i>Сбросить на стандартные
                         </button>
-                        <button type="button" class="btn btn-sm btn-primary" id="addStageBtn">
+                        <button type="button" class="btn btn-sm btn-accent" id="addStageBtn">
                             <i class="fas fa-plus me-1"></i>Добавить этап
                         </button>
                     </div>
@@ -126,30 +126,21 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="stageForm">
-                    <input type="hidden" id="stageId" value="">
-                    <input type="hidden" id="stageStandard" value="false">
+                <form method="POST" action="{{ url_for('settings_bp.selection_stages') }}">
+                    {{ form.csrf_token }}
                     <div class="mb-3">
-                        <label for="stageName" class="form-label">Название этапа</label>
-                        <input type="text" class="form-control" id="stageName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="stageDescription" class="form-label">Описание</label>
-                        <textarea class="form-control" id="stageDescription" rows="3"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="stageColor" class="form-label">Цвет</label>
-                        <input type="color" class="form-control form-control-color" id="stageColor" value="#6c757d">
+                        {{ form.stage.label(class="form-label") }}
+                        {{ form.stage(class="form-select") }}
                     </div>
                     <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="stageActive" checked>
-                        <label class="form-check-label" for="stageActive">Активен</label>
+                        {{ form.is_active(class="form-check-input") }}
+                        {{ form.is_active.label(class="form-check-label") }}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
                     </div>
                 </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" id="saveStageBtn">Сохранить</button>
             </div>
         </div>
     </div>
@@ -250,12 +241,8 @@
         // Обработчик кнопки "Добавить этап"
         document.getElementById('addStageBtn').addEventListener('click', function() {
             document.getElementById('stageModalLabel').textContent = 'Добавление этапа';
-            document.getElementById('stageId').value = '';
-            document.getElementById('stageName').value = '';
-            document.getElementById('stageDescription').value = '';
-            document.getElementById('stageColor').value = '#6c757d';
-            document.getElementById('stageActive').checked = true;
-            document.getElementById('stageStandard').value = 'false';
+            // Сбрасываем форму
+            document.querySelector('#stageModal form').reset();
             stageModal.show();
         });
         
@@ -310,79 +297,6 @@
                 console.error('Ошибка:', error);
                 alert('Произошла ошибка при добавлении стандартных этапов');
             });
-        });
-        
-        // Обработчик кнопки "Сохранить" в модальном окне
-        document.getElementById('saveStageBtn').addEventListener('click', function() {
-            const stageId = document.getElementById('stageId').value;
-            const stageName = document.getElementById('stageName').value;
-            const stageDescription = document.getElementById('stageDescription').value;
-            const stageColor = document.getElementById('stageColor').value;
-            const stageActive = document.getElementById('stageActive').checked;
-            const stageStandard = document.getElementById('stageStandard').value === 'true';
-            
-            if (!stageName) {
-                alert('Введите название этапа');
-                return;
-            }
-            
-            if (stageId) {
-                // Редактирование существующего этапа
-                const row = document.querySelector(`tr[data-id="${stageId}"]`);
-                if (row) {
-                    row.dataset.name = stageName;
-                    row.dataset.description = stageDescription;
-                    row.dataset.color = stageColor;
-                    row.dataset.active = stageActive.toString();
-                    
-                    row.querySelector('td:nth-child(2)').innerHTML = `
-                        <div class="d-flex align-items-center">
-                            <span class="color-dot me-2" style="background-color: ${stageColor}"></span>
-                            ${stageName}
-                        </div>
-                    `;
-                    row.querySelector('td:nth-child(3)').textContent = stageDescription;
-                    row.querySelector('td:nth-child(4) .color-sample').style.backgroundColor = stageColor;
-                }
-            } else {
-                // Добавление нового этапа
-                addStageToTable(null, stageName, stageDescription, stageColor, stageActive, false);
-                
-                // Удаляем сообщение "Этапы отбора не настроены", если оно есть
-                const noStagesRow = document.querySelector('.no-stages');
-                if (noStagesRow) {
-                    noStagesRow.remove();
-                }
-            }
-            
-            // Обновляем данные формы
-            updateStagesData();
-            
-            // Закрываем модальное окно
-            stageModal.hide();
-        });
-        
-        // Обработчик кнопок редактирования
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.edit-stage')) {
-                const row = e.target.closest('tr');
-                const stageId = row.dataset.id;
-                const stageName = row.dataset.name;
-                const stageDescription = row.dataset.description;
-                const stageColor = row.dataset.color;
-                const stageActive = row.dataset.active === 'true';
-                const stageStandard = row.dataset.standard === 'true';
-                
-                document.getElementById('stageModalLabel').textContent = 'Редактирование этапа';
-                document.getElementById('stageId').value = stageId;
-                document.getElementById('stageName').value = stageName;
-                document.getElementById('stageDescription').value = stageDescription;
-                document.getElementById('stageColor').value = stageColor;
-                document.getElementById('stageActive').checked = stageActive;
-                document.getElementById('stageStandard').value = stageStandard;
-                
-                stageModal.show();
-            }
         });
         
         // Обработчик кнопок удаления
@@ -442,44 +356,6 @@
         document.getElementById('stagesForm').addEventListener('submit', function() {
             updateStagesData();
         });
-        
-        // Функция для добавления этапа в таблицу
-        function addStageToTable(id, name, description, color, isActive, isStandard) {
-            const newRow = document.createElement('tr');
-            newRow.dataset.id = id || '';
-            newRow.dataset.name = name;
-            newRow.dataset.description = description || '';
-            newRow.dataset.color = color || '#6c757d';
-            newRow.dataset.active = (isActive !== false).toString();
-            newRow.dataset.standard = (isStandard === true).toString();
-            
-            newRow.innerHTML = `
-                <td class="handle"><i class="fas fa-grip-vertical"></i></td>
-                <td>
-                    <div class="d-flex align-items-center">
-                        <span class="color-dot me-2" style="background-color: ${color || '#6c757d'}"></span>
-                        ${name}
-                    </div>
-                </td>
-                <td>${description || ''}</td>
-                <td><span class="color-sample" style="background-color: ${color || '#6c757d'}"></span></td>
-                <td>
-                    ${isStandard ? 
-                    '<span class="badge bg-info">Стандартный</span>' : 
-                    '<span class="badge bg-primary">Персональный</span>'}
-                </td>
-                <td>
-                    <button type="button" class="btn btn-sm btn-outline-primary edit-stage me-1" title="Редактировать">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger delete-stage" title="Удалить">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            `;
-            
-            stagesTableBody.appendChild(newRow);
-        }
         
         // Функция для обновления данных формы
         function updateStagesData() {

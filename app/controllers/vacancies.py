@@ -71,7 +71,7 @@ def create():
             # Получаем данные из формы
             questions_json = request.form.get('questions_json', '[]')
             soft_questions_json = request.form.get('soft_questions_json', '[]')
-            
+        
             current_app.logger.info("=== Начало обработки данных формы ===")
             current_app.logger.info(f"Все данные формы: {dict(request.form)}")
             current_app.logger.info(f"questions_json: {questions_json}")
@@ -90,6 +90,7 @@ def create():
                 if not isinstance(questions, list):
                     current_app.logger.warning(f"questions не является списком: {type(questions)}")
                     questions = []
+                
                 if not isinstance(soft_questions, list):
                     current_app.logger.warning(f"soft_questions не является списком: {type(soft_questions)}")
                     soft_questions = []
@@ -127,7 +128,26 @@ def create():
                 flash('Ошибка при обработке вопросов', 'error')
                 return render_template('vacancies/create.html', form=form)
             
+            # Получаем этапы отбора для текущего HR
+            user_stages = User_Selection_Stage.query.filter_by(
+                user_id=current_user.id,
+                is_active=True
+            ).order_by(User_Selection_Stage.order).all()
+            
+            # Преобразуем этапы в JSON формат
+            selection_stages = []
+            for stage in user_stages:
+                selection_stages.append({
+                    'id': stage.stage_id,
+                    'name': stage.selection_stage.name,
+                    'description': stage.selection_stage.description,
+                    'order': stage.order,
+                    'color': stage.selection_stage.color
+                })
+                
             # Создаем новую вакансию
+            is_ai_generated = bool(form.is_ai_generated.data) if hasattr(form, 'is_ai_generated') and form.is_ai_generated.data else False
+            
             vacancy = Vacancy(
                 title=form.title.data,
                 id_c_employment_type=form.id_c_employment_type.data,
@@ -136,17 +156,21 @@ def create():
                 ideal_profile=form.ideal_profile.data,
                 questions_json=validated_questions,
                 soft_questions_json=validated_soft_questions,
+                selection_stages_json=selection_stages,
                 is_active=form.is_active.data,
                 created_by=current_user.id,
-                is_ai_generated=request.form.get('is_ai_generated') == 'True',
-                ai_generation_date=datetime.now(timezone.utc) if request.form.get('is_ai_generated') == 'True' else None,
-                ai_generation_prompt=request.form.get('ai_generation_prompt') or None,
-                ai_generation_metadata=json.loads(request.form.get('ai_generation_metadata', '{}'))
+                # Обработка AI-метаданных
+                is_ai_generated=is_ai_generated,
+                ai_generation_date=datetime.now(timezone.utc) if is_ai_generated else None,
+                ai_generation_prompt=form.ai_generation_prompt.data if hasattr(form, 'ai_generation_prompt') and is_ai_generated else None,
+                ai_generation_metadata=json.loads(form.ai_generation_metadata.data) if hasattr(form, 'ai_generation_metadata') and form.ai_generation_metadata.data and is_ai_generated else {}
             )
             
             current_app.logger.info("=== Данные вакансии перед сохранением ===")
             current_app.logger.info(f"questions_json: {json.dumps(vacancy.questions_json, ensure_ascii=False)}")
             current_app.logger.info(f"soft_questions_json: {json.dumps(vacancy.soft_questions_json, ensure_ascii=False)}")
+            current_app.logger.info(f"selection_stages_json: {json.dumps(vacancy.selection_stages_json, ensure_ascii=False)}")
+            current_app.logger.info(f"AI метаданные: is_ai_generated={vacancy.is_ai_generated}, date={vacancy.ai_generation_date}, prompt={vacancy.ai_generation_prompt}, metadata={vacancy.ai_generation_metadata}")
             
             db.session.add(vacancy)
             db.session.commit()
@@ -156,6 +180,7 @@ def create():
             current_app.logger.info(f"Сохраненные вопросы:")
             current_app.logger.info(f"questions_json: {json.dumps(vacancy.questions_json, ensure_ascii=False)}")
             current_app.logger.info(f"soft_questions_json: {json.dumps(vacancy.soft_questions_json, ensure_ascii=False)}")
+            current_app.logger.info(f"selection_stages_json: {json.dumps(vacancy.selection_stages_json, ensure_ascii=False)}")
             
             flash('Вакансия успешно создана', 'success')
             return redirect(url_for('vacancies.view', id=vacancy.id))
@@ -194,7 +219,7 @@ def edit(id):
                 vacancy.questions_json = []
             if vacancy.soft_questions_json is None:
                 vacancy.soft_questions_json = []
-            
+                
             logger.info(f"Данные вопросов из БД: {vacancy.questions_json}")
             logger.info(f"Данные soft-вопросов из БД: {vacancy.soft_questions_json}")
             
@@ -202,7 +227,7 @@ def edit(id):
             if not isinstance(vacancy.questions_json, list):
                 logger.warning(f"Данные вопросов не являются списком: {type(vacancy.questions_json)}")
                 vacancy.questions_json = []
-            
+                
             if not isinstance(vacancy.soft_questions_json, list):
                 logger.warning(f"Данные soft-вопросов не являются списком: {type(vacancy.soft_questions_json)}")
                 vacancy.soft_questions_json = []
@@ -217,7 +242,7 @@ def edit(id):
             
             logger.info(f"GET: Сериализованные вопросы: {questions_json}")
             logger.info(f"GET: Сериализованные soft-вопросы: {soft_questions_json}")
-            
+                
         except Exception as e:
             logger.error(f"Ошибка при подготовке данных формы: {e}")
             logger.error(traceback.format_exc())
@@ -243,7 +268,7 @@ def edit(id):
             
             logger.info(f"POST: Преобразованы вопросы: {questions}")
             logger.info(f"POST: Преобразованы soft-вопросы: {soft_questions}")
-            
+                
             # Обновляем данные вакансии
             vacancy.title = form.title.data
             vacancy.id_c_employment_type = form.id_c_employment_type.data
@@ -374,7 +399,7 @@ def candidates(id):
     query = Candidate.query.filter_by(vacancy_id=vacancy.id)
     
     # Фильтрация по статусу
-    if status_filter is not None:
+    if status_filter != 'all':
         query = query.filter_by(stage_id=status_filter)
     
     # Сортировка
@@ -560,8 +585,8 @@ def delete(id):
         
         # Логирование
         SystemLog.log(
-                event_type="delete_vacancy",
-                description=f"Удалена вакансия: {vacancy.title}",
+                    event_type="delete_vacancy",
+                    description=f"Удалена вакансия: {vacancy.title}",
             user_id=current_user.id,
             ip_address=request.remote_addr
         )

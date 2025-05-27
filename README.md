@@ -90,6 +90,31 @@ flask db upgrade
 flask create-admin
 ```
 
+## Конфигурация
+
+Проект использует систему конфигурации на основе классов:
+
+- `Config` - базовый класс с общими настройками
+- `DevelopmentConfig` - настройки для разработки (включен режим отладки и логирование SQL)
+- `TestingConfig` - настройки для тестирования (использует SQLite в памяти)
+- `ProductionConfig` - продакшн настройки (отключена отладка и тестирование)
+
+Конфигурация выбирается через переменную окружения `FLASK_ENV`:
+```bash
+FLASK_ENV=development  # для разработки
+FLASK_ENV=production   # для продакшена
+FLASK_ENV=testing     # для тестов
+```
+
+Основные настройки в `.env`:
+```env
+FLASK_APP=app
+FLASK_ENV=development
+SECRET_KEY=your-secret-key
+DATABASE_URL=postgresql://user:password@localhost:5432/hr_manager
+OPENAI_API_KEY=your-openai-api-key
+```
+
 ## Запуск проекта
 
 ### Разработка

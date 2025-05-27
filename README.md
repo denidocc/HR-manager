@@ -52,26 +52,12 @@ source venv/bin/activate  # для Linux/macOS
 pip install -r requirements.txt
 ```
 
-4. Установите Tesseract OCR:
-
-macOS:
-```bash
-brew install tesseract
-brew install tesseract-lang
-```
-
-Ubuntu/Debian:
-```bash
-sudo apt-get install tesseract-ocr
-sudo apt-get install tesseract-ocr-rus tesseract-ocr-eng tesseract-ocr-tur
-```
-
-5. Создайте файл `.env` на основе `.env.example`:
+4. Создайте файл `.env` на основе `.env.example`:
 ```bash
 cp .env.example .env
 ```
 
-6. Настройте переменные окружения в `.env`:
+5. Настройте переменные окружения в `.env`:
 ```env
 FLASK_APP=app
 FLASK_ENV=development
@@ -80,12 +66,12 @@ DATABASE_URL=postgresql://user:password@localhost:5432/hr_manager
 OPENAI_API_KEY=your-openai-api-key
 ```
 
-7. Инициализируйте базу данных:
+6. Инициализируйте базу данных:
 ```bash
 flask db upgrade
 ```
 
-8. Создайте первого администратора:
+7. Создайте первого администратора:
 ```bash
 flask create-admin
 ```
@@ -133,8 +119,6 @@ flask run
 gunicorn -c gunicorn_config.py "app:create_app()"
 ```
 
-2. Настройте Nginx (пример конфигурации в `nginx/`)
-
 ## Структура проекта
 
 ```
@@ -153,17 +137,6 @@ HR-manager/
 ├── config.py
 ├── requirements.txt
 └── README.md
-```
-
-## API документация
-
-API документация доступна по адресу `/api/docs` после запуска приложения.
-
-## Тестирование
-
-Запуск тестов:
-```bash
-pytest
 ```
 
 ## Развертывание
@@ -204,12 +177,6 @@ sudo systemctl start hr_manager
 - Rate limiting для API
 - JWT для мобильного API
 - Сессии для веб-интерфейса
-
-## Мониторинг и логирование
-
-- Логирование в файлы и консоль
-- Мониторинг через Prometheus
-- Алерты через Telegram бота
 
 ## Поддержка
 

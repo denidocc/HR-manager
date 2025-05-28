@@ -61,35 +61,35 @@
                             {% else %}
                                 <!-- Статические этапы, если у вакансии нет настроенных этапов отбора -->
                                 <li class="timeline-item {{ 'active' if candidate.stage_id >= 1 else '' }}">
-                                    <span class="timeline-point"></span>
-                                    <div class="timeline-content">
-                                        <h5>Рассмотрение резюме</h5>
-                                        <p>HR-менеджер изучает вашу заявку и резюме</p>
+                                <span class="timeline-point"></span>
+                                <div class="timeline-content">
+                                    <h5>Рассмотрение резюме</h5>
+                                    <p>HR-менеджер изучает вашу заявку и резюме</p>
                                         {% if candidate.stage_id == 1 %}
-                                            <small class="text-muted">В процессе</small>
-                                        {% endif %}
-                                    </div>
-                                </li>
+                                        <small class="text-muted">В процессе</small>
+                                    {% endif %}
+                                </div>
+                            </li>
                                 <li class="timeline-item {{ 'active' if candidate.stage_id >= 2 else '' }}">
-                                    <span class="timeline-point"></span>
-                                    <div class="timeline-content">
-                                        <h5>Интервью</h5>
-                                        <p>Приглашение на интервью с HR и техническими специалистами</p>
+                                <span class="timeline-point"></span>
+                                <div class="timeline-content">
+                                    <h5>Интервью</h5>
+                                    <p>Приглашение на интервью с HR и техническими специалистами</p>
                                         {% if candidate.stage_id == 2 and candidate.interview_date %}
-                                            <small class="text-muted">Запланировано на: {{ candidate.interview_date.strftime('%d.%m.%Y %H:%M') }}</small>
-                                        {% endif %}
-                                    </div>
-                                </li>
+                                        <small class="text-muted">Запланировано на: {{ candidate.interview_date.strftime('%d.%m.%Y %H:%M') }}</small>
+                                    {% endif %}
+                                </div>
+                            </li>
                                 <li class="timeline-item {{ 'active' if candidate.stage_id >= 3 else '' }}">
-                                    <span class="timeline-point"></span>
-                                    <div class="timeline-content">
-                                        <h5>Ожидание решения</h5>
-                                        <p>Ожидание решения после интервью</p>
+                                <span class="timeline-point"></span>
+                                <div class="timeline-content">
+                                    <h5>Ожидание решения</h5>
+                                    <p>Ожидание решения после интервью</p>
                                         {% if candidate.stage_id == 3 %}
                                             <small class="text-muted">В процессе</small>
                                         {% endif %}
-                                    </div>
-                                </li>
+                                </div>
+                            </li>
                             {% endif %}
                         </ul>
                         

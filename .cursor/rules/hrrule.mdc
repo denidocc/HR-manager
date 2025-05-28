@@ -3,15 +3,22 @@ description:
 globs: 
 alwaysApply: true
 ---
-# Правила структурирования проекта Flask с PostgreSQL
+# Универсальные правила структурирования Flask-проектов с PostgreSQL
 
-# Название проекта: Clever HR
+## Основные принципы при работе с кодом:
+
+1. **Всегда проверяй существующую структуру** перед созданием нового
+2. **Следуй DRY** - не дублируй код
+3. **Безопасность превыше всего** - валидируй, шифруй, проверяй
+4. **Думай о масштабировании** - код должен быть готов к росту
+5. **Документируй сложную логику** - будущий ты скажет спасибо
 
 ## 1. Структура файлов и каталогов
 
 - **Корневой каталог**:
   - `app/` - основной пакет приложения
   - `migrations/` - миграции базы данных (Alembic)
+  - `tests/` - тесты приложения
   - `config.py` - файл конфигурации
   - `.env` - переменные окружения (не включать в репозиторий)
   - `.env.example` - пример файла для настройки
@@ -31,258 +38,633 @@ alwaysApply: true
   - `version.py` - версионирование приложения
   - `errors.py` - обработка ошибок
 
+- **Тесты (tests/)**:
+  - `unit/` - юнит-тесты для моделей и утилит
+  - `integration/` - интеграционные тесты для API
+  - `fixtures/` - тестовые данные
+
 ## 2. Инициализация приложения
 
 - **Расширения Flask** в `app/__init__.py`:
-  - Инициализация основных расширений: SQLAlchemy, Migrate, CSRF, Login, JWT
-  - Подключение дополнительных сервисов: Redis, Firebase, APScheduler
-  - Настройка логирования с различными обработчиками для консоли и файлов
-  - Регистрация всех blueprints
-  - Определение обработчиков ошибок и middleware
-- **Пример инициализации**:
   ```python
-  app = Flask(__name__)
-  app.config.from_object(Config)
-  app.secret_key = os.environ.get('SECRET_KEY')
-  db = SQLAlchemy(app)
-  migrate = Migrate(app, db)
-  csrf = CSRFProtect(app)
-  login = LoginManager(app)
-  jwt = JWTManager(app)
+  from flask import Flask
+  from flask_sqlalchemy import SQLAlchemy
+  from flask_migrate import Migrate
+  from flask_wtf.csrf import CSRFProtect
+  from flask_login import LoginManager
+  from flask_jwt_extended import JWTManager
+  from flask_caching import Cache
+  from flask_limiter import Limiter
+  from flask_limiter.util import get_remote_address
+  import logging
+  from logging.handlers import RotatingFileHandler
+  
+  # Инициализация расширений
+  db = SQLAlchemy()
+  migrate = Migrate()
+  csrf = CSRFProtect()
+  login_manager = LoginManager()
+  jwt = JWTManager()
+  cache = Cache()
+  limiter = Limiter(key_func=get_remote_address)
+  
+  def create_app(config_name='development'):
+      app = Flask(__name__)
+      app.config.from_object(Config)
+      
+      # Инициализация расширений
+      db.init_app(app)
+      migrate.init_app(app, db)
+      csrf.init_app(app)
+      login_manager.init_app(app)
+      jwt.init_app(app)
+      cache.init_app(app)
+      limiter.init_app(app)
+      
+      # Настройка логирования
+      setup_logging(app)
+      
+      # Регистрация blueprints
+      register_blueprints(app)
+      
+      # Обработчики ошибок
+      register_error_handlers(app)
+      
+      return app
   ```
 
 ## 3. Правила именования
 
 ### Модели
-- Имена классов моделей: **CamelCase**
-  - Таблицы-справочники (словари): начинаются с `C_` (например, `C_Gender`, `C_User_Status`)
-  - Ассоциативные таблицы: используют названия связываемых таблиц с подчеркиванием (например, `User_Roles`)
-  - Основные сущности: просто CamelCase (например, `User`, `Booking`)
+- **Имена классов моделей: CamelCase**
+  - Таблицы-справочники: префикс `C_` (например, `C_Gender`, `C_Status`)
+  - Ассоциативные таблицы: названия связываемых таблиц (например, `User_Roles`)
+  - Основные сущности: просто CamelCase (например, `User`, `Order`)
 
-- Имена файлов моделей: **snake_case**
-  - Соответствуют имени класса в snake_case (например, `user.py`, `c_gender.py`)
+- **Имена файлов моделей: snake_case**
+  - Соответствуют имени класса в snake_case
   - Все модели импортируются в `models/__init__.py`
 
-- Определение таблиц:
-  - Использовать параметр `__tablename__` в snake_case (`__tablename__ = 'user'`)
-  - Имя таблицы должно соответствовать имени класса в snake_case
+- **Пример модели с полной типизацией:**
+  ```python
+  import sqlalchemy as sa
+  import sqlalchemy.orm as so
+  from typing import Optional
+  from datetime import datetime
+  from app import db
+  
+  class User(db.Model):
+      __tablename__ = 'user'
+      
+      id: so.Mapped[int] = so.mapped_column(primary_key=True)
+      username: so.Mapped[str] = so.mapped_column(sa.Text, unique=True, index=True)
+      _email: so.Mapped[Optional[str]] = so.mapped_column(sa.Text, nullable=True)
+      _phone: so.Mapped[Optional[str]] = so.mapped_column(sa.Text, nullable=True)
+      is_active: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=True)
+      created_at: so.Mapped[datetime] = so.mapped_column(
+          sa.DateTime(timezone=True), 
+          server_default=sa.func.now()
+      )
+      
+      # Отношения
+      roles: so.Mapped[list["Role"]] = so.relationship(
+          secondary="user_roles",
+          back_populates="users"
+      )
+      
+      @property
+      def email(self):
+          """Расшифровка email"""
+          if self._email:
+              return db.session.execute(
+                  sa.text("SELECT pgp_sym_decrypt(:email::bytea, :key)"),
+                  {"email": self._email, "key": current_app.config['ENCRYPTION_KEY']}
+              ).scalar()
+          return None
+  ```
 
 ### Контроллеры
 
-- Файлы контроллеров:
-  - Web: `controllers/имя_функционала.py` (например, `auth.py`, `admin.py`)
-  - Mobile: `mobile_controllers/mobile_имя_функционала.py` (например, `mobile_auth.py`)
+- **Файлы контроллеров:**
+  - Web: `controllers/функционал.py` (например, `auth.py`, `admin.py`)
+  - Mobile: `mobile_controllers/mobile_функционал.py`
 
-- Blueprints:
-  - Web: `имя_функционала_bp` (например, `auth_bp`, `admin_bp`)
-  - Mobile: `mobile_имя_функционала_bp` (например, `mobile_auth_bp`)
+- **Blueprints:**
+  - Web: `функционал_bp` (например, `auth_bp`)
+  - Mobile: `mobile_функционал_bp`
 
-- Маршруты:
-  - Web: `/имя_функционала/действие` (например, `/auth/login`, `/admin/users`)
-  - Mobile: `/app/тип_пользователя/действие` (например, `/app/client/register`, `/app/master/profile`)
-
-- Функции обработчики:
-  - Web: `имя_действия` (например, `login`, `admin_index`)
-  - Mobile: `app_тип_пользователя_действие` (например, `app_client_register`)
+- **Маршруты:**
+  - Web: `/функционал/действие`
+  - Mobile: `/app/модуль/действие`
 
 ### Утилиты
 
-- Классы утилит:
-  - CamelCase с говорящим названием (например, `PushNotificationService`)
-  - Сгруппированные методы для одной сущности
-
-- Файлы утилит:
-  - snake_case (`api_response.py`, `push_notif_service.py`)
-  - Каждая утилита в отдельном файле
-
-- Константы:
-  - UPPER_CASE с подчеркиваниями
-  - Определять на уровне класса или модуля
+- **Классы утилит:** CamelCase (например, `EmailService`)
+- **Файлы утилит:** snake_case (например, `email_service.py`)
+- **Константы:** UPPER_CASE
 
 ## 4. Модели и типизация данных
 
-- **Обязательное использование типизации**:
-  ```python
-  id: so.Mapped[int] = so.mapped_column(primary_key=True)
-  name: so.Mapped[str] = so.mapped_column(sa.Text, index=True)
-  is_active: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=True)
-  created_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime(timezone=True))
-  ```
-
-- **Текстовые поля**:
-  - Всегда использовать `sa.Text` для строковых полей, а не `String`
-  - Использовать `index=True` для полей, по которым будет поиск
-
-- **Отношения**:
-  - Аннотировать тип с указанием класса в кавычках
-  ```python
-  user: so.Mapped["User"] = so.relationship(back_populates="tokens")
-  services: so.Mapped[list["Service"]] = so.relationship(back_populates="user")
-  ```
-
-- **Шифрование чувствительных данных**:
-  - Использовать PostgreSQL pgp_sym_encrypt для шифрования
-  - Имена зашифрованных полей начинаются с подчеркивания (`_phone`, `_email`)
-  - Создавать свойства для доступа к расшифрованным данным
+- **Обязательная типизация всех полей**
+- **Использовать `sa.Text` для строковых полей**
+- **Индексы для полей поиска**
+- **Шифрование чувствительных данных**
 
 ## 5. Конфигурация
 
-- Использовать класс `Config` в `config.py`
-- Загружать конфигурацию из `.env` файла
-- Разделять конфигурацию на секции:
-  - Основные настройки Flask
-  - Настройки базы данных
-  - Секреты и токены
-  - Настройки API и внешних сервисов
-  - Пути к файлам и папкам
+```python
+import os
+from datetime import timedelta
+from dotenv import load_dotenv
 
-- **Пример конфигурации**:
-  ```python
-  class Config:
-      SECRET_KEY = os.environ.get('SECRET_KEY')
-      DB_NAME = os.environ.get('DB_NAME')
-      DB_USER = os.environ.get('DB_USER')
-      SQLALCHEMY_DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-      JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
-      JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=15)
-  ```
+load_dotenv()
+
+class Config:
+    # Основные настройки
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    ENV = os.environ.get('FLASK_ENV', 'development')
+    
+    # База данных
+    DB_NAME = os.environ.get('DB_NAME')
+    DB_USER = os.environ.get('DB_USER')
+    DB_PASSWORD = os.environ.get('DB_PASSWORD')
+    DB_HOST = os.environ.get('DB_HOST', 'localhost')
+    DB_PORT = os.environ.get('DB_PORT', '5432')
+    SQLALCHEMY_DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # JWT
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=15)
+    
+    # Шифрование
+    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
+    
+    # Кеширование
+    CACHE_TYPE = "redis"
+    CACHE_REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    
+    # Rate limiting
+    RATELIMIT_STORAGE_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/1')
+```
 
 ## 6. Аутентификация и авторизация
 
-- JWT для API
-- Сессии для веб-интерфейса
-- Запрет CSRF для API, включение для веб-интерфейса
-- Хранить токены в базе данных и отслеживать отозванные токены
+- **JWT для API**
+- **Сессии для веб-интерфейса**
+- **CSRF защита для веб-форм**
 
-- **Декораторы аутентификации**:
-  ```python
-  @auth_required
-  @safe_jwt_required()
-  @admin_required
-  ```
+```python
+from functools import wraps
+from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+from flask_login import current_user
 
-- **Типовой механизм проверки**:
-  ```python
-  def auth_required(f):
-      @wraps(f)
-      def decorated(*args, **kwargs):
-          if not current_user.is_authenticated:
-              try:
-                  verify_jwt_in_request()
-              except:
-                  abort(401)
-          return f(*args, **kwargs)
-      return decorated
-  ```
+def auth_required(f):
+    """Универсальный декоратор аутентификации"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            try:
+                verify_jwt_in_request()
+            except:
+                abort(401)
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    """Декоратор для проверки прав администратора"""
+    @wraps(f)
+    @auth_required
+    def decorated(*args, **kwargs):
+        user = current_user if current_user.is_authenticated else get_current_user()
+        if not user.is_admin:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+```
 
 ## 7. Обработка данных
 
-- **Валидация входных данных**:
-  - Проверка обязательных полей
-  - Валидация форматов (телефоны, email)
-  - Проверка бизнес-правил
+### Валидация входных данных
 
-- **Шифрование чувствительных данных**:
-  - Использовать PostgreSQL pgp_sym_encrypt
-  - Хранить закрытые ключи отдельно от кода
+```python
+def validate_request_data(required_fields, data):
+    """Проверка обязательных полей"""
+    missing = [field for field in required_fields if field not in data or not data[field]]
+    if missing:
+        raise ValidationError(f"Missing required fields: {', '.join(missing)}")
+```
 
-- **Работа с транзакциями**:
-  ```python
-  try:
-      # операции с БД
-      db.session.commit()
-  except:
-      db.session.rollback()
-      raise
-  ```
+### Транзакции и обработка ошибок БД
+
+```python
+from contextlib import contextmanager
+from sqlalchemy.exc import IntegrityError, OperationalError
+
+@contextmanager
+def transaction():
+    """Контекстный менеджер для безопасных транзакций"""
+    try:
+        yield db.session
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Transaction failed: {str(e)}", exc_info=True)
+        raise
+    finally:
+        db.session.close()
+
+def with_transaction(f):
+    """Декоратор для автоматического управления транзакциями"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        try:
+            result = f(*args, **kwargs)
+            db.session.commit()
+            return result
+        except IntegrityError as e:
+            db.session.rollback()
+            app.logger.error(f"Integrity error in {f.__name__}: {str(e)}")
+            if "unique constraint" in str(e):
+                raise ValidationError("Запись с такими данными уже существует")
+            raise
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error in {f.__name__}: {str(e)}", exc_info=True)
+            raise
+    return decorated
+```
 
 ## 8. API принципы
 
-- **Единый формат ответов**:
-  ```python
-  def api_response(status="success", message="", data=None, status_code=200, ...):
-      response = {"status": status, "message": message, "data": data}
-      return jsonify(response), status_code
-  ```
+### Единый формат ответов
 
-- **Стандартизированная обработка ошибок**:
-  ```python
-  class APIErrors:
-      USER_NOT_FOUND = APIError(code="user_not_found", message="User not found", status_code=404)
-      
-      @staticmethod
-      def to_response(error):
-          return {"status": "error", "message": error.message, "error_code": error.code, "status_code": error.status_code}
-  ```
+```python
+def api_response(status="success", message="", data=None, status_code=200, errors=None):
+    """Стандартный формат ответа API"""
+    response = {
+        "status": status,
+        "message": message,
+        "data": data or {}
+    }
+    if errors:
+        response["errors"] = errors
+    return jsonify(response), status_code
+```
 
-- **Документация Swagger**:
-  - Описание всех эндпоинтов
-  - Примеры запросов и ответов
-  - Схемы данных
+### Обработка ошибок
+
+```python
+@app.errorhandler(ValidationError)
+def handle_validation_error(e):
+    return api_response(
+        status="error",
+        message=str(e),
+        status_code=400
+    )
+
+@app.errorhandler(404)
+def handle_not_found(e):
+    return api_response(
+        status="error",
+        message="Resource not found",
+        status_code=404
+    )
+
+@app.errorhandler(500)
+def handle_internal_error(e):
+    app.logger.error(f"Internal server error: {str(e)}", exc_info=True)
+    return api_response(
+        status="error",
+        message="Internal server error",
+        status_code=500
+    )
+```
 
 ## 9. Логирование
 
-- **Настройка логгеров**:
-  - Файловый и консольный логгеры
-  - Различные уровни для разных сред (development, production)
-  - Структурированный формат логов
+### Настройка логирования
 
-- **Стандартное использование**:
-  ```python
-  app.logger.info("Starting process...")
-  app.logger.warning("Warning condition")
-  app.logger.error("Error occurred", exc_info=True)
-  ```
+```python
+def setup_logging(app):
+    """Настройка системы логирования"""
+    if not os.path.exists('logs'):
+        os.mkdir('logs')
+    
+    # Уровень логирования
+    log_level = logging.DEBUG if app.config['ENV'] == 'development' else logging.INFO
+    app.logger.setLevel(log_level)
+    
+    # Форматтер
+    formatter = logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    )
+    
+    # Файловый обработчик для всех логов
+    file_handler = RotatingFileHandler(
+        'logs/app.log',
+        maxBytes=10485760,  # 10MB
+        backupCount=10
+    )
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(log_level)
+    app.logger.addHandler(file_handler)
+    
+    # Отдельный файл для ошибок
+    error_handler = RotatingFileHandler(
+        'logs/errors.log',
+        maxBytes=10485760,
+        backupCount=10
+    )
+    error_handler.setFormatter(formatter)
+    error_handler.setLevel(logging.ERROR)
+    app.logger.addHandler(error_handler)
+    
+    # Консольный вывод для development
+    if app.config['ENV'] == 'development':
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(logging.DEBUG)
+        app.logger.addHandler(console_handler)
+```
 
-- **Контекстная информация**:
-  ```python
-  app.logger.error("Error", extra={"user_id": user_id, "request_data": data})
-  ```
+### Использование логирования
 
-## 10. Разделение мобильного и веб-интерфейса
+```python
+# Информационные сообщения
+app.logger.info(f"User {user_id} logged in successfully")
 
-- Отдельные контроллеры для веб и мобильного API
-- Различные префиксы URL для разных типов клиентов
-- Специфические декораторы для мобильных эндпоинтов
+# Предупреждения
+app.logger.warning(f"Deprecated API endpoint called: {request.path}")
 
-- **Web контроллеры**:
+# Ошибки с трейсбеком
+try:
+    process_payment(order_id)
+except Exception as e:
+    app.logger.error(f"Payment processing failed for order {order_id}", exc_info=True)
+
+# Структурированное логирование
+app.logger.info(
+    "API request processed",
+    extra={
+        "user_id": current_user.id,
+        "endpoint": request.endpoint,
+        "method": request.method,
+        "status_code": response.status_code,
+        "duration_ms": duration
+    }
+)
+```
+
+## 10. Разделение веб и мобильного интерфейса
+
+- **Web контроллеры:**
   - Возвращают HTML шаблоны
-  - Используют Flash сообщения
-  - Работают с сессиями
+  - Используют Flask-Login для аутентификации
+  - Работают с сессиями и flash сообщениями
 
-- **Mobile контроллеры**:
+- **Mobile контроллеры:**
   - Возвращают только JSON
-  - Используют JWT аутентификацию
-  - Имеют более детальную обработку ошибок
+  - Используют JWT для аутентификации
+  - Не используют CSRF защиту
 
 ## 11. Безопасность
 
-- **Хеширование паролей**:
-  - Использовать Argon2 (более современный и безопасный)
-  - Отслеживать изменения паролей
+### Хеширование паролей
 
-- **Шифрование чувствительных данных**:
-  - Телефоны, email и другие персональные данные
+```python
+from argon2 import PasswordHasher
 
-- **Защита от атак**:
-  - CSRF защита для веб-форм
-  - Ограничение скорости запросов (rate limiting)
-  - Проверка API ключей
-  - Безопасные заголовки HTTP
+ph = PasswordHasher()
 
-- **Проверка входных данных**:
-  - Валидация всех данных от пользователя
-  - Предотвращение SQL инъекций через ORM
-  - Экранирование HTML при выводе
+class User(db.Model):
+    # ...
+    password_hash: so.Mapped[str] = so.mapped_column(sa.Text)
+    
+    def set_password(self, password):
+        """Установка пароля с хешированием"""
+        self.password_hash = ph.hash(password)
+    
+    def check_password(self, password):
+        """Проверка пароля"""
+        try:
+            ph.verify(self.password_hash, password)
+            return True
+        except:
+            return False
+```
 
+### Защита от атак
+
+- **CSRF защита для веб-форм**
+- **Rate limiting для API**
+- **Валидация всех входных данных**
+- **Безопасные HTTP заголовки**
+
+```python
+@app.after_request
+def set_security_headers(response):
+    """Установка безопасных заголовков"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+```
 
 ## 12. Стилистика написания кода
 
-- **DRY**
-- **Clean Code**
-- **Не писать код стилей в теге head**
-- **Не писать логический код в шаблоне, вся логика должна быть в контроллерах**
-- **Не писать код js в html шаблоне**
-- **Прежде чем начать создавать что-то новое пересмотри структуру проекта**
-- **use context7**
-- **Сначало распиши что ты понял от ответа пользователя и задай уточняющие вопросы а после ответа от пользователя начинай генерировать код**
+- **DRY** - не повторяй себя
+- **Clean Code** - чистый и понятный код
+- **Не писать стили в теге head**
+- **Не писать JS в HTML шаблонах**
+- **Вся логика в контроллерах, не в шаблонах**
+- **Использовать контекст для понимания кода**
+
+## 13. Правила взаимодействия с ассистентом
+
+- **При обращении за помощью:**
+  - Всегда предоставлять контекст: какой файл, какая функция
+  - Показывать связанные модели и контроллеры
+  - Указывать версии используемых библиотек при проблемах
+  
+- **При создании нового функционала:**
+  - Сначала обсудить архитектурное решение
+  - Проверить, нет ли похожего функционала в проекте
+  - Следовать существующим паттернам
+
+- **При отладке:**
+  - Предоставлять полный traceback ошибки
+  - Показывать соответствующие части кода
+  - Указывать, что уже пробовали исправить
+
+## 14. Тестирование
+
+### Структура тестов
+
+```python
+# tests/conftest.py
+import pytest
+from app import create_app, db
+
+@pytest.fixture
+def app():
+    """Создание тестового приложения"""
+    app = create_app('testing')
+    with app.app_context():
+        db.create_all()
+        yield app
+        db.drop_all()
+
+@pytest.fixture
+def client(app):
+    """Тестовый клиент"""
+    return app.test_client()
+
+@pytest.fixture
+def auth_headers(client):
+    """Заголовки с JWT токеном"""
+    response = client.post('/app/auth/login', json={
+        'username': 'test_user',
+        'password': 'test_password'
+    })
+    token = response.json['data']['access_token']
+    return {'Authorization': f'Bearer {token}'}
+```
+
+### Примеры тестов
+
+```python
+def test_user_registration(client):
+    """Тест регистрации пользователя"""
+    response = client.post('/app/auth/register', json={
+        'username': 'newuser',
+        'email': 'newuser@example.com',
+        'password': 'secure_password'
+    })
+    assert response.status_code == 201
+    assert response.json['status'] == 'success'
+```
+
+## 15. Работа с миграциями
+
+### Создание миграций
+
+```bash
+# Создание новой миграции
+flask db migrate -m "add user roles table"
+
+# Применение миграций
+flask db upgrade
+
+# Откат миграции
+flask db downgrade
+```
+
+### Правила работы с миграциями
+
+- Всегда проверять автосгенерированные миграции
+- Не удалять примененные миграции в продакшене
+- Добавлять комментарии для сложных изменений
+
+## 16. Оптимизация и производительность
+
+### Запросы к БД
+
+```python
+# Избегать N+1 запросов
+users = User.query.options(
+    so.joinedload(User.roles),
+    so.joinedload(User.orders)
+).filter_by(is_active=True).all()
+
+# Пагинация для больших выборок
+page = request.args.get('page', 1, type=int)
+per_page = 20
+users = User.query.paginate(
+    page=page,
+    per_page=per_page,
+    error_out=False
+)
+```
+
+### Кеширование
+
+```python
+@cache.cached(timeout=300, key_prefix='all_users')
+def get_all_users():
+    """Получение всех пользователей с кешированием"""
+    return User.query.filter_by(is_active=True).all()
+
+# Инвалидация кеша
+def invalidate_user_cache():
+    cache.delete_memoized(get_all_users)
+```
+
+## 17. Документация
+
+### Docstrings
+
+```python
+def create_user(username: str, email: str, password: str) -> User:
+    """
+    Создание нового пользователя.
+    
+    Args:
+        username: Имя пользователя
+        email: Email адрес
+        password: Пароль в открытом виде
+        
+    Returns:
+        User: Созданный пользователь
+        
+    Raises:
+        ValidationError: Если данные не валидны
+        IntegrityError: Если пользователь уже существует
+    """
+    # Реализация функции
+```
+
+### Swagger документация
+
+```python
+from flasgger import swag_from
+
+@mobile_auth_bp.route('/register', methods=['POST'])
+@swag_from({
+    'tags': ['Authentication'],
+    'summary': 'Register new user',
+    'parameters': [{
+        'in': 'body',
+        'name': 'body',
+        'schema': {
+            'type': 'object',
+            'required': ['username', 'email', 'password'],
+            'properties': {
+                'username': {'type': 'string'},
+                'email': {'type': 'string'},
+                'password': {'type': 'string'}
+            }
+        }
+    }],
+    'responses': {
+        '201': {'description': 'User created successfully'},
+        '400': {'description': 'Validation error'}
+    }
+})
+def app_register():
+    """Регистрация нового пользователя"""
+    pass
+```
+
+## 18. Чеклист перед коммитом
+- [ ] Код следует установленным соглашениям
+- [ ] Добавлены необходимые индексы в БД
+- [ ] Чувствительные данные зашифрованы
+- [ ] Входные данные валидируются
+- [ ] Добавлены тесты для нового функционала
+- [ ] Обновлена документация
+- [ ] Нет хардкода секретов или конфигурации
+- [ ] Логирование добавлено для важных операций
+- [ ] Проверено на SQL инъекции и XSS
+- [ ] Добавлены docstrings для новых функций

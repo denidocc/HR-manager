@@ -53,6 +53,10 @@ class User(UserMixin, db.Model):
     def is_candidate(self):
         return self.role == 'candidate'
     
+    @property
+    def is_admin(self):
+        return self.role == 'admin'
+    
     def get_selection_stages(self):
         """Получает этапы отбора пользователя, или стандартные если у него их нет"""
         from app.models.c_selection_stage import C_Selection_Stage

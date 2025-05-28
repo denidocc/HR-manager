@@ -4,7 +4,7 @@
 from flask import Blueprint, render_template, jsonify, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db, cache
-from app.models import Vacancy, Candidate, Notification, SystemLog, User, C_User_Status, Skill, SkillCategory, CandidateSkill, VacancySkill, Industry, VacancyIndustry, C_Selection_Stage
+from app.models import Vacancy, Candidate, Notification, SystemLog, User, C_User_Status, Skill, SkillCategory, CandidateSkill, VacancySkill, Industry, VacancyIndustry, C_Selection_Stage, C_Selection_Status
 from app.controllers.auth import admin_required, hr_required
 from sqlalchemy import func, desc, and_, cast, case
 from datetime import datetime, timezone, timedelta
@@ -14,6 +14,7 @@ import pandas as pd
 import re
 from collections import Counter
 from app.utils.decorators import profile_time
+from app.forms.admin import SelectionStageForm, SelectionStatusForm
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -1250,3 +1251,179 @@ def update_kanban_status():
         current_app.logger.error(f"Ошибка при обновлении статуса кандидата: {str(e)}")
         db.session.rollback()
         return jsonify({'status': 'error', 'message': f'Произошла ошибка: {str(e)}'}), 500
+
+@dashboard_bp.route('/selection-stages')
+@profile_time
+@login_required
+@admin_required
+def selection_stages():
+    """Страница управления этапами и статусами отбора"""
+    stages = C_Selection_Stage.query.order_by(C_Selection_Stage.order).all()
+    statuses = C_Selection_Status.query.order_by(C_Selection_Status.order).all()
+    
+    stage_form = SelectionStageForm()
+    stage_form.status_id.choices = [(s.id, s.name) for s in statuses]
+    
+    status_form = SelectionStatusForm()
+    
+    return render_template('dashboard/selection_stages.html',
+                         stages=stages,
+                         statuses=statuses,
+                         stage_form=stage_form,
+                         status_form=status_form,
+                         title='Управление этапами отбора')
+
+@dashboard_bp.route('/selection-stages/create', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def create_selection_stage():
+    """Создание нового этапа отбора"""
+    form = SelectionStageForm()
+    form.status_id.choices = [(s.id, s.name) for s in C_Selection_Status.query.all()]
+    
+    if form.validate_on_submit():
+        stage = C_Selection_Stage(
+            name=form.name.data,
+            description=form.description.data,
+            color=form.color.data,
+            order=form.order.data,
+            is_standard=form.is_standard.data,
+            is_active=form.is_active.data,
+            id_c_selection_status=form.status_id.data
+        )
+        
+        try:
+            db.session.add(stage)
+            db.session.commit()
+            flash('Этап отбора успешно создан', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при создании этапа отбора: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-statuses/create', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def create_selection_status():
+    """Создание нового статуса этапа"""
+    form = SelectionStatusForm()
+    
+    if form.validate_on_submit():
+        status = C_Selection_Status(
+            name=form.name.data,
+            code=form.code.data,
+            description=form.description.data,
+            order=form.order.data,
+            is_active=form.is_active.data
+        )
+        
+        try:
+            db.session.add(status)
+            db.session.commit()
+            flash('Статус этапа успешно создан', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при создании статуса этапа: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-stages/<int:id>/edit', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def edit_selection_stage(id):
+    """Редактирование этапа отбора"""
+    stage = C_Selection_Stage.query.get_or_404(id)
+    form = SelectionStageForm()
+    form.status_id.choices = [(s.id, s.name) for s in C_Selection_Status.query.all()]
+    
+    if form.validate_on_submit():
+        stage.name = form.name.data
+        stage.description = form.description.data
+        stage.color = form.color.data
+        stage.order = form.order.data
+        stage.is_standard = form.is_standard.data
+        stage.is_active = form.is_active.data
+        stage.id_c_selection_status = form.status_id.data
+        
+        try:
+            db.session.commit()
+            flash('Этап отбора успешно обновлен', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при обновлении этапа отбора: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-statuses/<int:id>/edit', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def edit_selection_status(id):
+    """Редактирование статуса этапа"""
+    status = C_Selection_Status.query.get_or_404(id)
+    form = SelectionStatusForm()
+    
+    if form.validate_on_submit():
+        status.name = form.name.data
+        status.code = form.code.data
+        status.description = form.description.data
+        status.order = form.order.data
+        status.is_active = form.is_active.data
+        
+        try:
+            db.session.commit()
+            flash('Статус этапа успешно обновлен', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при обновлении статуса этапа: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-stages/<int:id>/delete', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def delete_selection_stage(id):
+    """Удаление этапа отбора"""
+    stage = C_Selection_Stage.query.get_or_404(id)
+    
+    if stage.is_standard:
+        flash('Нельзя удалить стандартный этап отбора', 'danger')
+        return redirect(url_for('dashboard.selection_stages'))
+    
+    try:
+        db.session.delete(stage)
+        db.session.commit()
+        flash('Этап отбора успешно удален', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка при удалении этапа отбора: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-statuses/<int:id>/delete', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def delete_selection_status(id):
+    """Удаление статуса этапа"""
+    status = C_Selection_Status.query.get_or_404(id)
+    
+    # Проверяем, используется ли статус в этапах отбора
+    if C_Selection_Stage.query.filter_by(id_c_selection_status=id).first():
+        flash('Нельзя удалить статус, который используется в этапах отбора', 'danger')
+        return redirect(url_for('dashboard.selection_stages'))
+    
+    try:
+        db.session.delete(status)
+        db.session.commit()
+        flash('Статус этапа успешно удален', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка при удалении статуса этапа: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))

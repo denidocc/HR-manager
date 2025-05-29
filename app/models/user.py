@@ -5,6 +5,7 @@ import sqlalchemy.orm as so
 from app import db, login_manager, argon2
 from app.utils.encryption import encrypted_property
 from app.models.user_selection_stages import User_Selection_Stage
+from flask import current_app
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -24,7 +25,7 @@ class User(UserMixin, db.Model):
     avatar_path: so.Mapped[str] = so.mapped_column(sa.Text, nullable=True)
     is_active: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=True)
     
-    # Свойства для шифрованных полей
+    # Свойства для шифрованных полей - используем реализацию из encryption.py
     email = encrypted_property('email')
     phone = encrypted_property('phone')
     

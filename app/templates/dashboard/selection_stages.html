@@ -1,0 +1,428 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Управление этапами отбора</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Панель управления</a></li>
+        <li class="breadcrumb-item active">Этапы отбора</li>
+    </ol>
+    
+    <div class="row">
+        <!-- Этапы отбора -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Этапы отбора</h5>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createStageModal">
+                        <i class="fas fa-plus me-1"></i>Добавить этап
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Название</th>
+                                    <th class="col-md-2">Статус</th>
+                                    <th>Тип</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stage in stages %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="color-dot me-2" style="background-color: {{ stage.color }}"></span>
+                                            {{ stage.name }}
+                                        </div>
+                                    </td>
+                                    <td>{{ stage.status.name }}</td>
+                                    <td>
+                                        {% if stage.is_standard %}
+                                        <span class="badge bg-info">Стандартный</span>
+                                        {% else %}
+                                        <span class="badge bg-primary">Пользовательский</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary edit-stage" 
+                                                data-bs-toggle="modal" data-bs-target="#editStageModal"
+                                                data-id="{{ stage.id }}"
+                                                data-name="{{ stage.name }}"
+                                                data-description="{{ stage.description }}"
+                                                data-color="{{ stage.color }}"
+                                                data-order="{{ stage.order }}"
+                                                data-standard="{{ stage.is_standard|lower }}"
+                                                data-active="{{ stage.is_active|lower }}"
+                                                data-status="{{ stage.id_c_selection_status }}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger delete-stage"
+                                                data-bs-toggle="modal" data-bs-target="#deleteStageModal"
+                                                data-id="{{ stage.id }}"
+                                                data-name="{{ stage.name }}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Статусы этапов -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Статусы этапов</h5>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createStatusModal">
+                        <i class="fas fa-plus me-1"></i>Добавить статус
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Название</th>
+                                    <th>Код</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for status in statuses %}
+                                <tr>
+                                    <td>{{ status.name }}</td>
+                                    <td><code>{{ status.code }}</code></td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary edit-status"
+                                                data-bs-toggle="modal" data-bs-target="#editStatusModal"
+                                                data-id="{{ status.id }}"
+                                                data-name="{{ status.name }}"
+                                                data-code="{{ status.code }}"
+                                                data-description="{{ status.description }}"
+                                                data-order="{{ status.order }}"
+                                                data-active="{{ status.is_active|lower }}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger delete-status"
+                                                data-bs-toggle="modal" data-bs-target="#deleteStatusModal"
+                                                data-id="{{ status.id }}"
+                                                data-name="{{ status.name }}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно создания этапа -->
+<div class="modal fade" id="createStageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создание этапа отбора</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('dashboard.create_selection_stage') }}">
+                <div class="modal-body">
+                    {{ stage_form.csrf_token }}
+                    <div class="mb-3">
+                        {{ stage_form.name.label(class="form-label") }}
+                        {{ stage_form.name(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ stage_form.description.label(class="form-label") }}
+                        {{ stage_form.description(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ stage_form.color.label(class="form-label") }}
+                        {{ stage_form.color(class="form-control", type="color") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ stage_form.order.label(class="form-label") }}
+                        {{ stage_form.order(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ stage_form.status_id.label(class="form-label") }}
+                        {{ stage_form.status_id(class="form-select") }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ stage_form.is_standard(class="form-check-input") }}
+                        {{ stage_form.is_standard.label(class="form-check-label") }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ stage_form.is_active(class="form-check-input") }}
+                        {{ stage_form.is_active.label(class="form-check-label") }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования этапа -->
+<div class="modal fade" id="editStageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактирование этапа отбора</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="editStageForm">
+                <div class="modal-body">
+                    {{ stage_form.csrf_token }}
+                    <div class="mb-3">
+                        {{ stage_form.name.label(class="form-label") }}
+                        {{ stage_form.name(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ stage_form.description.label(class="form-label") }}
+                        {{ stage_form.description(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ stage_form.color.label(class="form-label") }}
+                        {{ stage_form.color(class="form-control", type="color") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ stage_form.order.label(class="form-label") }}
+                        {{ stage_form.order(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ stage_form.status_id.label(class="form-label") }}
+                        {{ stage_form.status_id(class="form-select") }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ stage_form.is_standard(class="form-check-input") }}
+                        {{ stage_form.is_standard.label(class="form-check-label") }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ stage_form.is_active(class="form-check-input") }}
+                        {{ stage_form.is_active.label(class="form-check-label") }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно удаления этапа -->
+<div class="modal fade" id="deleteStageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Удаление этапа отбора</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить этап отбора "<span id="deleteStageName"></span>"?</p>
+                <p class="text-danger">Это действие нельзя отменить!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="POST" id="deleteStageForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно создания статуса -->
+<div class="modal fade" id="createStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создание статуса этапа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('dashboard.create_selection_status') }}">
+                <div class="modal-body">
+                    {{ status_form.csrf_token }}
+                    <div class="mb-3">
+                        {{ status_form.name.label(class="form-label") }}
+                        {{ status_form.name(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ status_form.code.label(class="form-label") }}
+                        {{ status_form.code(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ status_form.description.label(class="form-label") }}
+                        {{ status_form.description(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ status_form.order.label(class="form-label") }}
+                        {{ status_form.order(class="form-control") }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ status_form.is_active(class="form-check-input") }}
+                        {{ status_form.is_active.label(class="form-check-label") }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования статуса -->
+<div class="modal fade" id="editStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактирование статуса этапа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="editStatusForm">
+                <div class="modal-body">
+                    {{ status_form.csrf_token }}
+                    <div class="mb-3">
+                        {{ status_form.name.label(class="form-label") }}
+                        {{ status_form.name(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ status_form.code.label(class="form-label") }}
+                        {{ status_form.code(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ status_form.description.label(class="form-label") }}
+                        {{ status_form.description(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ status_form.order.label(class="form-label") }}
+                        {{ status_form.order(class="form-control") }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ status_form.is_active(class="form-check-input") }}
+                        {{ status_form.is_active.label(class="form-check-label") }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно удаления статуса -->
+<div class="modal fade" id="deleteStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Удаление статуса этапа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить статус этапа "<span id="deleteStatusName"></span>"?</p>
+                <p class="text-danger">Это действие нельзя отменить!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="POST" id="deleteStatusForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработка редактирования этапа
+    const editStageButtons = document.querySelectorAll('.edit-stage');
+    editStageButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const form = document.getElementById('editStageForm');
+            form.action = "{{ url_for('dashboard.edit_selection_stage', id=0) }}".replace('0', this.dataset.id);
+            
+            const nameInput = form.querySelector('#name');
+            const descriptionInput = form.querySelector('#description');
+            const colorInput = form.querySelector('#color');
+            const orderInput = form.querySelector('#order');
+            const standardInput = form.querySelector('#is_standard');
+            const activeInput = form.querySelector('#is_active');
+            const statusInput = form.querySelector('#status_id');
+            
+            nameInput.value = this.dataset.name;
+            descriptionInput.value = this.dataset.description;
+            colorInput.value = this.dataset.color;
+            orderInput.value = this.dataset.order;
+            standardInput.checked = this.dataset.standard === 'true';
+            activeInput.checked = this.dataset.active === 'true';
+            statusInput.value = this.dataset.status;
+        });
+    });
+    
+    // Обработка удаления этапа
+    const deleteStageButtons = document.querySelectorAll('.delete-stage');
+    deleteStageButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const form = document.getElementById('deleteStageForm');
+            form.action = "{{ url_for('dashboard.delete_selection_stage', id=0) }}".replace('0', this.dataset.id);
+            document.getElementById('deleteStageName').textContent = this.dataset.name;
+        });
+    });
+    
+    // Обработка редактирования статуса
+    const editStatusButtons = document.querySelectorAll('.edit-status');
+    editStatusButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const form = document.getElementById('editStatusForm');
+            form.action = "{{ url_for('dashboard.edit_selection_status', id=0) }}".replace('0', this.dataset.id);
+            
+            const nameInput = form.querySelector('#name');
+            const codeInput = form.querySelector('#code');
+            const descriptionInput = form.querySelector('#description');
+            const orderInput = form.querySelector('#order');
+            const activeInput = form.querySelector('#is_active');
+            
+            nameInput.value = this.dataset.name;
+            codeInput.value = this.dataset.code;
+            descriptionInput.value = this.dataset.description;
+            orderInput.value = this.dataset.order;
+            activeInput.checked = this.dataset.active === 'true';
+        });
+    });
+    
+    // Обработка удаления статуса
+    const deleteStatusButtons = document.querySelectorAll('.delete-status');
+    deleteStatusButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const form = document.getElementById('deleteStatusForm');
+            form.action = "{{ url_for('dashboard.delete_selection_status', id=0) }}".replace('0', this.dataset.id);
+            document.getElementById('deleteStatusName').textContent = this.dataset.name;
+        });
+    });
+});
+</script>
+{% endblock %}
+{% endblock %} 

@@ -34,12 +34,12 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link {% if request.endpoint and request.endpoint.startswith('vacancies') %}active{% endif %}" href="{{ url_for('vacancies.index') }}">
+                                <a class="nav-link {% if request.endpoint and request.endpoint.startswith('vacancies') %}active{% endif %}" href="{% if current_user.role == 'admin' %}{{ url_for('dashboard.all_vacancies') }}{% else %}{{ url_for('vacancies.index') }}{% endif %}">
                                     <i class="fas fa-clipboard-list me-1"></i>Вакансии
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link {% if request.endpoint and request.endpoint.startswith('candidates') %}active{% endif %}" href="{{ url_for('candidates.index') }}">
+                                <a class="nav-link {% if request.endpoint and request.endpoint.startswith('candidates') %}active{% endif %}" href="{% if current_user.role == 'admin' %}{{ url_for('dashboard.all_candidates') }}{% else %}{{ url_for('candidates.index') }}{% endif %}">
                                     <i class="fas fa-users me-1"></i>Кандидаты
                                 </a>
                             </li>
@@ -47,6 +47,11 @@
                             <li class="nav-item">
                                 <a class="nav-link {% if request.endpoint == 'dashboard.users' %}active{% endif %}" href="{{ url_for('dashboard.users') }}">
                                     <i class="fas fa-user-cog me-1"></i>Пользователи
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'dashboard.selection_stages' %}active{% endif %}" href="{{ url_for('dashboard.selection_stages') }}">
+                                    <i class="fas fa-tasks me-1"></i>Этапы отбора
                                 </a>
                             </li>
                             {% endif %}

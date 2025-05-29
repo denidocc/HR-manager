@@ -4,7 +4,7 @@
 from flask import Blueprint, render_template, jsonify, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db, cache
-from app.models import Vacancy, Candidate, Notification, SystemLog, User, C_User_Status, Skill, SkillCategory, CandidateSkill, VacancySkill, Industry, VacancyIndustry, C_Selection_Stage
+from app.models import Vacancy, Candidate, Notification, SystemLog, User, C_User_Status, Skill, SkillCategory, CandidateSkill, VacancySkill, Industry, VacancyIndustry, C_Selection_Stage, C_Selection_Status, C_Employment_Type
 from app.controllers.auth import admin_required, hr_required
 from sqlalchemy import func, desc, and_, cast, case
 from datetime import datetime, timezone, timedelta
@@ -14,6 +14,7 @@ import pandas as pd
 import re
 from collections import Counter
 from app.utils.decorators import profile_time
+from app.forms.admin import SelectionStageForm, SelectionStatusForm
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -1250,3 +1251,397 @@ def update_kanban_status():
         current_app.logger.error(f"Ошибка при обновлении статуса кандидата: {str(e)}")
         db.session.rollback()
         return jsonify({'status': 'error', 'message': f'Произошла ошибка: {str(e)}'}), 500
+
+@dashboard_bp.route('/selection-stages')
+@profile_time
+@login_required
+@admin_required
+def selection_stages():
+    """Страница управления этапами и статусами отбора"""
+    stages = C_Selection_Stage.query.order_by(C_Selection_Stage.order).all()
+    statuses = C_Selection_Status.query.order_by(C_Selection_Status.order).all()
+    
+    stage_form = SelectionStageForm()
+    stage_form.status_id.choices = [(s.id, s.name) for s in statuses]
+    
+    status_form = SelectionStatusForm()
+    
+    return render_template('dashboard/selection_stages.html',
+                         stages=stages,
+                         statuses=statuses,
+                         stage_form=stage_form,
+                         status_form=status_form,
+                         title='Управление этапами отбора')
+
+@dashboard_bp.route('/selection-stages/create', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def create_selection_stage():
+    """Создание нового этапа отбора"""
+    form = SelectionStageForm()
+    form.status_id.choices = [(s.id, s.name) for s in C_Selection_Status.query.all()]
+    
+    if form.validate_on_submit():
+        stage = C_Selection_Stage(
+            name=form.name.data,
+            description=form.description.data,
+            color=form.color.data,
+            order=form.order.data,
+            is_standard=form.is_standard.data,
+            is_active=form.is_active.data,
+            id_c_selection_status=form.status_id.data
+        )
+        
+        try:
+            db.session.add(stage)
+            db.session.commit()
+            flash('Этап отбора успешно создан', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при создании этапа отбора: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-statuses/create', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def create_selection_status():
+    """Создание нового статуса этапа"""
+    form = SelectionStatusForm()
+    
+    if form.validate_on_submit():
+        status = C_Selection_Status(
+            name=form.name.data,
+            code=form.code.data,
+            description=form.description.data,
+            order=form.order.data,
+            is_active=form.is_active.data
+        )
+        
+        try:
+            db.session.add(status)
+            db.session.commit()
+            flash('Статус этапа успешно создан', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при создании статуса этапа: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-stages/<int:id>/edit', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def edit_selection_stage(id):
+    """Редактирование этапа отбора"""
+    stage = C_Selection_Stage.query.get_or_404(id)
+    form = SelectionStageForm()
+    form.status_id.choices = [(s.id, s.name) for s in C_Selection_Status.query.all()]
+    
+    if form.validate_on_submit():
+        stage.name = form.name.data
+        stage.description = form.description.data
+        stage.color = form.color.data
+        stage.order = form.order.data
+        stage.is_standard = form.is_standard.data
+        stage.is_active = form.is_active.data
+        stage.id_c_selection_status = form.status_id.data
+        
+        try:
+            db.session.commit()
+            flash('Этап отбора успешно обновлен', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при обновлении этапа отбора: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-statuses/<int:id>/edit', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def edit_selection_status(id):
+    """Редактирование статуса этапа"""
+    status = C_Selection_Status.query.get_or_404(id)
+    form = SelectionStatusForm()
+    
+    if form.validate_on_submit():
+        status.name = form.name.data
+        status.code = form.code.data
+        status.description = form.description.data
+        status.order = form.order.data
+        status.is_active = form.is_active.data
+        
+        try:
+            db.session.commit()
+            flash('Статус этапа успешно обновлен', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при обновлении статуса этапа: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-stages/<int:id>/delete', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def delete_selection_stage(id):
+    """Удаление этапа отбора"""
+    stage = C_Selection_Stage.query.get_or_404(id)
+    
+    if stage.is_standard:
+        flash('Нельзя удалить стандартный этап отбора', 'danger')
+        return redirect(url_for('dashboard.selection_stages'))
+    
+    try:
+        db.session.delete(stage)
+        db.session.commit()
+        flash('Этап отбора успешно удален', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка при удалении этапа отбора: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/selection-statuses/<int:id>/delete', methods=['POST'])
+@profile_time
+@login_required
+@admin_required
+def delete_selection_status(id):
+    """Удаление статуса этапа"""
+    status = C_Selection_Status.query.get_or_404(id)
+    
+    # Проверяем, используется ли статус в этапах отбора
+    if C_Selection_Stage.query.filter_by(id_c_selection_status=id).first():
+        flash('Нельзя удалить статус, который используется в этапах отбора', 'danger')
+        return redirect(url_for('dashboard.selection_stages'))
+    
+    try:
+        db.session.delete(status)
+        db.session.commit()
+        flash('Статус этапа успешно удален', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка при удалении статуса этапа: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard.selection_stages'))
+
+@dashboard_bp.route('/all-vacancies')
+@profile_time
+@login_required
+@admin_required
+def all_vacancies():
+    """Страница со всеми вакансиями (для администратора)"""
+    # Параметры фильтрации и пагинации
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    status = request.args.get('status', 'all')
+    
+    # Сначала получаем список ID вакансий, соответствующих условиям фильтрации
+    vacancy_ids_query = db.session.query(Vacancy.id).order_by(Vacancy.created_at.desc())
+    
+    # Применяем фильтры
+    if status != 'all':
+        vacancy_ids_query = vacancy_ids_query.filter(Vacancy.status == status)
+    
+    # Получаем общее количество записей
+    total_items = vacancy_ids_query.count()
+    total_pages = (total_items + per_page - 1) // per_page  # округление вверх
+    
+    # Применяем пагинацию к списку ID
+    paginated_ids = vacancy_ids_query.limit(per_page).offset((page - 1) * per_page).all()
+    paginated_ids = [id[0] for id in paginated_ids]  # Получаем список ID
+    
+    # Если нет ID для текущей страницы
+    if not paginated_ids:
+        vacancies = []
+        pagination = {
+            "current_page": page,
+            "total_pages": total_pages,
+            "total_items": total_items,
+            "per_page": per_page
+        }
+        return render_template(
+            'dashboard/all_vacancies.html',
+            vacancies=vacancies,
+            pagination=pagination,
+            current_status=status,
+            title='Все вакансии'
+        )
+    
+    # Получаем полную информацию для отобранных ID
+    base_query = db.session.query(
+        Vacancy.id,
+        Vacancy.title,
+        Vacancy.id_c_employment_type,
+        Vacancy.created_at,
+        Vacancy.created_by,
+        Vacancy.status,
+        Vacancy.is_ai_generated,
+        User.full_name.label('created_by_name'),
+        C_Employment_Type.name.label('employment_type_name'),
+        func.count(Candidate.id).label('candidates_count')
+    ).join(
+        C_Employment_Type, Vacancy.id_c_employment_type == C_Employment_Type.id
+    ).outerjoin(
+        User, Vacancy.created_by == User.id
+    ).outerjoin(
+        Candidate, Candidate.vacancy_id == Vacancy.id
+    ).filter(
+        Vacancy.id.in_(paginated_ids)  # Фильтруем только по отобранным ID
+    ).group_by(
+        Vacancy.id,
+        Vacancy.title,
+        Vacancy.id_c_employment_type,
+        Vacancy.created_at,
+        Vacancy.created_by,
+        User.full_name,
+        Vacancy.status,
+        Vacancy.is_ai_generated,
+        C_Employment_Type.name
+    ).order_by(Vacancy.created_at.desc())
+    
+    db_vacancies = base_query.all()
+    
+    vacancies = [{
+        'id': vacancy.id,
+        'title': vacancy.title,
+        'id_c_employment_type': vacancy.id_c_employment_type,
+        'created_at': vacancy.created_at.strftime('%d.%m.%Y %H:%M'),
+        'created_by': vacancy.created_by,
+        'status': vacancy.status,
+        'is_ai_generated': vacancy.is_ai_generated,
+        'employment_type_name': vacancy.employment_type_name,
+        'candidates_count': vacancy.candidates_count,
+        'created_by_name': vacancy.created_by_name
+    } for vacancy in db_vacancies]
+    
+    # Информация о пагинации
+    pagination = {
+        "current_page": page,
+        "total_pages": total_pages,
+        "total_items": total_items,
+        "per_page": per_page
+    }
+    
+    return render_template(
+        'dashboard/all_vacancies.html',
+        vacancies=vacancies,
+        pagination=pagination,
+        current_status=status,
+        title='Все вакансии'
+    )
+
+@dashboard_bp.route('/all-candidates')
+@profile_time
+@login_required
+@admin_required
+def all_candidates():
+    """Страница со всеми кандидатами (для администратора)"""
+    # Параметры фильтрации и пагинации
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 15, type=int)
+    stage_id = request.args.get('stage', type=int)
+    vacancy_id = request.args.get('vacancy', type=int)
+    sort_by = request.args.get('sort', 'date')
+    
+    candidate_query = db.session.query(
+        Candidate.id,
+        Candidate.full_name,
+        Candidate._email,
+        Candidate._phone,
+        Candidate.ai_match_percent,
+        Candidate.user_id,
+        Candidate.vacancy_id,
+        Candidate.stage_id,
+        Candidate.created_at,
+        Candidate.tracking_code,
+        Vacancy.title.label('vacancy_title')
+    ).join(
+        C_Selection_Stage, Candidate.stage_id == C_Selection_Stage.id
+    ).join(
+        Vacancy, Candidate.vacancy_id == Vacancy.id
+    )
+    
+    # Применяем фильтры
+    if stage_id:
+        candidate_query = candidate_query.filter(Candidate.stage_id == stage_id)
+    if vacancy_id:
+        candidate_query = candidate_query.filter(Candidate.vacancy_id == vacancy_id)
+    
+    # Сортировка
+    if sort_by == 'match':
+        candidate_query = candidate_query.order_by(Candidate.ai_match_percent.desc(), Candidate.created_at.desc())
+    else:  # sort_by == 'date'
+        candidate_query = candidate_query.order_by(Candidate.created_at.desc())
+    
+    # Получаем общее количество записей
+    total_items = candidate_query.count()
+    total_pages = (total_items + per_page - 1) // per_page  # округление вверх
+    
+    # Применяем пагинацию
+    candidate_subquery = candidate_query.limit(per_page).offset((page - 1) * per_page).subquery()
+    
+    # Получаем результаты с дешифровкой
+    db_candidates = db.session.query(
+        candidate_subquery.c.id,
+        candidate_subquery.c.full_name,
+        func.pgp_sym_decrypt(
+            cast(candidate_subquery.c._email, sa.LargeBinary),
+            current_app.config['ENCRYPTION_KEY'],
+            current_app.config.get('ENCRYPTION_OPTIONS', '')
+        ).label('email'),
+        func.pgp_sym_decrypt(
+            cast(candidate_subquery.c._phone, sa.LargeBinary),
+            current_app.config['ENCRYPTION_KEY'],
+            current_app.config.get('ENCRYPTION_OPTIONS', '')
+        ).label('phone'),
+        candidate_subquery.c.ai_match_percent,
+        candidate_subquery.c.user_id,
+        candidate_subquery.c.vacancy_id,
+        candidate_subquery.c.vacancy_title,
+        candidate_subquery.c.stage_id,
+        candidate_subquery.c.created_at,
+        candidate_subquery.c.tracking_code
+    ).all()
+    
+     # Преобразуем результаты в список словарей для шаблона
+    candidates = [{
+        'id': candidate.id,
+        'full_name': candidate.full_name,
+        'email': candidate.email,
+        'phone': candidate.phone,
+        'ai_match_percent': candidate.ai_match_percent,
+        'user_id': candidate.user_id,
+        'vacancy_id': candidate.vacancy_id,
+        'vacancy_title': candidate.vacancy_title,
+        'stage_id': candidate.stage_id,
+        'created_at': candidate.created_at.strftime('%d.%m.%Y %H:%M'),
+        'tracking_code': candidate.tracking_code
+    } for candidate in db_candidates]
+    
+    # Информация о пагинации
+    pagination = {
+        "current_page": page,
+        "total_pages": total_pages,
+        "total_items": total_items,
+        "per_page": per_page
+    }
+    
+    # Получаем список вакансий и этапов для фильтрации
+    vacancies = Vacancy.query.all()
+    stages = C_Selection_Stage.query.all()
+    
+    return render_template(
+        'dashboard/all_candidates.html',
+        candidates=candidates,
+        pagination=pagination,
+        vacancies=vacancies,
+        stages=stages,
+        current_stage=stage_id,
+        current_vacancy=vacancy_id,
+        sort_by=sort_by,
+        title='Все кандидаты'
+    )

@@ -3,41 +3,41 @@
 {% block content %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <div class="container-fluid">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{{ url_for('dashboard.hr_dashboard') }}">Главная</a></li>
             <li class="breadcrumb-item active">Канбан кандидатов</li>
-        </ol>
-    </nav>
+                </ol>
+            </nav>
 
     <div class="card mb-4">
-        <div class="card-body">
+                <div class="card-body">
             <form method="get" class="row g-3">
                 <div class="col-md-5">
-                    <label for="vacancy_id" class="form-label">Вакансия</label>
-                    <select class="form-select" id="vacancy_id" name="vacancy_id">
-                        <option value="">Все вакансии</option>
-                        {% for vacancy in vacancies %}
+                            <label for="vacancy_id" class="form-label">Вакансия</label>
+                            <select class="form-select" id="vacancy_id" name="vacancy_id">
+                                <option value="">Все вакансии</option>
+                                {% for vacancy in vacancies %}
                         <option value="{{ vacancy.id }}" {% if vacancy_id == vacancy.id %}selected{% endif %}>
                             {{ vacancy.title }}
                         </option>
-                        {% endfor %}
-                    </select>
-                </div>
+                                {% endfor %}
+                            </select>
+                        </div>
                 <div class="col-md-5">
-                    <label for="sort_by" class="form-label">Сортировка</label>
-                    <select class="form-select" id="sort_by" name="sort_by">
+                            <label for="sort_by" class="form-label">Сортировка</label>
+                            <select class="form-select" id="sort_by" name="sort_by">
                         <option value="date" {% if sort_by == 'date' %}selected{% endif %}>По дате</option>
-                        <option value="match" {% if sort_by == 'match' %}selected{% endif %}>По совпадению</option>
-                    </select>
-                </div>
+                                <option value="match" {% if sort_by == 'match' %}selected{% endif %}>По совпадению</option>
+                            </select>
+                        </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary">Применить</button>
                 </div>
             </form>
         </div>
     </div>
-
+    
     <div class="kanban-board">
         {% for stage in selection_stages %}
         <div class="kanban-column" data-stage-id="{{ stage.id }}">
@@ -57,13 +57,13 @@
                         <div class="kanban-card-info">
                             <div class="kanban-card-vacancy">Вакансия: {{ candidate.vacancy_title }}</div>
                             <div class="kanban-card-date">Создано: {{ candidate.created_at.strftime('%d.%m.%Y') }}</div>
-                        </div>
+                </div>
                         <div class="kanban-card-progress">
                             <div class="progress-bar-bg">
                                 <div class="progress-bar-fill" style="width: {{ candidate.ai_match_percent or 0 }}%;"></div>
-                            </div>
+                                        </div>
                             <span class="progress-bar-label">{{ candidate.ai_match_percent or 0 }}%</span>
-                        </div>
+                    </div>
                     </div>
                 </a>
                 {% endfor %}
@@ -198,7 +198,7 @@
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {
     const cards = document.querySelectorAll('.kanban-card');
     const columns = document.querySelectorAll('.kanban-column');
     
@@ -281,6 +281,6 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Произошла ошибка при обновлении этапа отбора: ' + error.message);
         });
     }
-});
+    });
 </script>
 {% endblock %} 

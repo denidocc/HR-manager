@@ -585,8 +585,8 @@ def delete(id):
         
         # Логирование
         SystemLog.log(
-                    event_type="delete_vacancy",
-                    description=f"Удалена вакансия: {vacancy.title}",
+            event_type="delete_vacancy",
+            description=f"Удалена вакансия: {vacancy.title}",
             user_id=current_user.id,
             ip_address=request.remote_addr
         )
